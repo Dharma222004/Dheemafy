@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1f1b2e"/>
+      <stop offset="40%" stop-color="#12121e"/>
+      <stop offset="100%" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1ed760" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#1db954" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#00ffff" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="discGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#282836"/>
+      <stop offset="100%" stop-color="#14141e"/>
+    </linearGradient>
+    <linearGradient id="noteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1ed760"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="300" height="300" rx="12" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle ambient glow -->
+  <circle cx="150" cy="150" r="110" fill="url(#glowGrad)"/>
+
+  <!-- Stylized Vinyl / CD disc -->
+  <circle cx="150" cy="150" r="88" fill="url(#discGrad)" stroke="rgba(255,255,255,0.06)" stroke-width="2"/>
+  <circle cx="150" cy="150" r="72" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1.5"/>
+  <circle cx="150" cy="150" r="56" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1.5"/>
+  
+  <!-- Center hub -->
+  <circle cx="150" cy="150" r="38" fill="#12121a" stroke="rgba(30,215,96,0.3)" stroke-width="2"/>
+
+  <!-- Modern Music Note Icon -->
+  <g transform="translate(133, 131) scale(0.068)">
+    <path fill="url(#noteGrad)" d="M470.38 1.51c-10.84-2.85-22.18.99-29.28 9.87L221.1 287.41c-3.1 3.88-4.78 8.7-4.78 13.68v130.68c-17.65-10.9-38.65-17.1-61.32-17.1-63.51 0-115 51.49-115 115s51.49 115 115 115 115-51.49 115-115V327.97l170-212.5v196.3c-17.65-10.9-38.65-17.1-61.32-17.1-63.51 0-115 51.49-115 115s51.49 115 115 115 115-51.49 115-115V32c0-13.88-8.87-26.24-22.28-29.49z"/>
+  </g>
+</svg>

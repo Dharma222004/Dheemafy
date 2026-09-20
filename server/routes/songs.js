@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
     }
   }
 
-  let whereClauses = ['(m.is_active = 1 OR m.is_active IS NULL)'];
+  let whereClauses = ['m.is_active = 1'];
   let countParams = [];
   let selectParams = [userId];
 
@@ -115,8 +115,9 @@ router.get('/', async (req, res) => {
   const totalCount = db.prepare(`SELECT COUNT(*) as count FROM media_file m WHERE ${whereSql}`).get(...countParams).count;
 
   const songsRaw = db.prepare(`
-    SELECT m.id, m.title, m.artist, m.artists_json, m.artist_id, m.album, m.album_id, m.movie, m.duration,
-      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language, m.year,
+    SELECT m.id, m.title, m.artist, m.artists_json, m.artist_id, m.album, m.album_id, m.album_artist,
+      m.movie, m.duration, m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+      m.year, m.folder,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
     WHERE ${whereSql}
@@ -124,7 +125,18 @@ router.get('/', async (req, res) => {
     LIMIT ? OFFSET ?
   `).all(...selectParams, limit, offset);
 
-  const songs = songsRaw.map(formatSongRow);
+  // Guarantee that each unique Cloudinary asset is returned exactly once
+  const seenSongKeys = new Set();
+  const dedupedSongsRaw = [];
+  for (const s of songsRaw) {
+    const key = s.cloudinary_public_id || s.id;
+    if (!seenSongKeys.has(key)) {
+      seenSongKeys.add(key);
+      dedupedSongsRaw.push(s);
+    }
+  }
+
+  const songs = dedupedSongsRaw.map(formatSongRow);
 
   if (catalogEtag) {
     res.setHeader('ETag', catalogEtag);
@@ -207,7 +219,9 @@ router.get('/summary', (req, res) => {
 router.get('/:id', (req, res) => {
   const userId = (req.user && req.user.id) || 'admin-user-id';
   const song = db.prepare(`
-    SELECT m.*,
+    SELECT m.id, m.title, m.artist, m.artists_json, m.artist_id, m.album, m.album_id, m.album_artist,
+      m.movie, m.duration, m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+      m.year, m.folder, m.slug,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
     WHERE m.id = ?

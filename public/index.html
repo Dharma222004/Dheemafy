@@ -1,19 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spotkify – Web Player</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <meta name="description" content="Spotkify Web Player – Stream your favorite music collection.">
+  <title>Dheemafy – Web Player</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=5">
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=5">
+  <link rel="shortcut icon" href="/favicon.png?v=5">
+  <link rel="apple-touch-icon" href="/favicon.png?v=5">
+  <meta name="description" content="Dheemafy Web Player – Stream your favorite music collection.">
   <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
   <link rel="dns-prefetch" href="https://res.cloudinary.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.7">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4.0">
   <script>
-    (function() {
+    (function () {
       try {
         var params = new URLSearchParams(window.location.search);
         var u = (params.get('username') || '').trim();
@@ -22,48 +27,54 @@
         if ((u.toLowerCase() === 'sharu' && (p === 'sharu@123' || p === 'Sharu@123')) || auto) {
           localStorage.setItem('spotkify_auth', 'true');
           localStorage.setItem('spotkify_user', 'sharu');
-          try { window.history.replaceState({}, document.title, window.location.pathname); } catch (e) {}
+          try { window.history.replaceState({}, document.title, window.location.pathname); } catch (e) { }
         }
         var isAuth = localStorage.getItem('spotkify_auth') === 'true' || sessionStorage.getItem('spotkify_auth') === 'true';
         var user = (localStorage.getItem('spotkify_user') || sessionStorage.getItem('spotkify_user') || '').trim().toLowerCase();
         if (isAuth && (user === 'sharu' || user === 'you')) {
           document.documentElement.classList.add('spotkify-unlocked');
         }
-      } catch (e) {}
+      } catch (e) { }
     })();
   </script>
 </head>
+
 <body class="locked">
-  <!-- SPOTKIFY AUTHENTICATION GATE (sharu / sharu@123) -->
+  <!-- DHEEMAFY AUTHENTICATION GATE (sharu / sharu@123) -->
   <div class="spotkify-login-gate" id="spotkifyLoginGate">
     <div class="login-mesh-bg"></div>
     <div class="login-card">
       <div class="login-brand-hero">
         <div class="login-logo-glow">
-          <img src="/favicon.svg" alt="Spotkify Logo" class="login-logo-img">
+          <img src="/favicon.png" alt="Dheemafy Logo" class="login-logo-img">
         </div>
-        <h1 class="login-brand-heading">Spotkify</h1>
+        <h1 class="login-brand-heading">Dheemafy</h1>
         <p class="login-brand-tagline">Music for everyone • Web Player</p>
       </div>
 
       <div class="login-card-body">
-        <h2 class="login-form-title">Log in to Spotkify</h2>
+        <h2 class="login-form-title">Log in to Dheemafy</h2>
 
         <div class="login-alert-box hidden" id="loginAlertBox">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
           </svg>
           <span id="loginAlertText">Incorrect username or password.</span>
         </div>
 
-        <form id="spotkifyLoginForm" class="login-form" autocomplete="on" action="javascript:void(0);" onsubmit="spotkifyDoLogin(); return false;">
+        <form id="spotkifyLoginForm" class="login-form" autocomplete="on" action="javascript:void(0);"
+          onsubmit="spotkifyDoLogin(); return false;">
           <div class="form-group">
             <label for="loginUsername" class="form-label">Username</label>
             <div class="input-container">
               <svg class="field-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                <path
+                  d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
               </svg>
-              <input type="text" id="loginUsername" name="username" class="form-input" placeholder="Enter username" value="" required autofocus spellcheck="false" autocapitalize="none" autocorrect="off" autocomplete="username">
+              <input type="text" id="loginUsername" name="username" class="form-input" placeholder="Enter username"
+                value="" required autofocus spellcheck="false" autocapitalize="none" autocorrect="off"
+                autocomplete="username">
             </div>
           </div>
 
@@ -73,12 +84,16 @@
             </div>
             <div class="input-container">
               <svg class="field-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                <path
+                  d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
               </svg>
-              <input type="password" id="loginPassword" name="password" class="form-input" placeholder="Enter password" value="" required spellcheck="false" autocapitalize="none" autocorrect="off" autocomplete="current-password">
+              <input type="password" id="loginPassword" name="password" class="form-input" placeholder="Enter password"
+                value="" required spellcheck="false" autocapitalize="none" autocorrect="off"
+                autocomplete="current-password">
               <button type="button" class="btn-toggle-pw" id="btnTogglePw" title="Toggle password visibility">
                 <svg id="pwEyeIcon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                  <path
+                    d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
                 </svg>
               </button>
             </div>
@@ -93,8 +108,10 @@
           </div>
 
           <button type="button" class="btn-login-submit" id="btnLoginSubmit" onclick="spotkifyDoLogin()">
-            <span>Log In to Spotkify</span>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-7.85-1.42 1.42L16.86 11H5v2z"/></svg>
+            <span>Log In to Dheemafy</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-7.85-1.42 1.42L16.86 11H5v2z" />
+            </svg>
           </button>
         </form>
       </div>
@@ -102,7 +119,7 @@
   </div>
 
   <script>
-    window.spotkifyDoLogin = function() {
+    window.spotkifyDoLogin = function () {
       var uInp = document.getElementById('loginUsername');
       var pInp = document.getElementById('loginPassword');
       var alertBox = document.getElementById('loginAlertBox');
@@ -126,11 +143,11 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: u, password: p })
-      }).then(function(r) {
-        return r.json().then(function(data) {
+      }).then(function (r) {
+        return r.json().then(function (data) {
           return { ok: r.ok, data: data };
         });
-      }).then(function(res) {
+      }).then(function (res) {
         if (!res.ok || !res.data || !res.data.data) {
           if (alertText) alertText.textContent = 'Incorrect username or password. Please try again.';
           if (alertBox) alertBox.classList.remove('hidden');
@@ -165,17 +182,17 @@
         if (alertBox) alertBox.classList.add('hidden');
         if (gate) {
           gate.classList.add('fade-out');
-          setTimeout(function() {
+          setTimeout(function () {
             gate.style.display = 'none';
           }, 300);
         }
 
-        document.querySelectorAll('.profile-name-text, .user-handle').forEach(function(el) { el.textContent = displayName; });
+        document.querySelectorAll('.profile-name-text, .user-handle').forEach(function (el) { el.textContent = displayName; });
         if (window.spotkifyInitApp) {
           window.spotkifyInitApp();
         }
         if (btn) btn.classList.remove('loading');
-      }).catch(function() {
+      }).catch(function () {
         if (alertText) alertText.textContent = 'Incorrect username or password. Please try again.';
         if (alertBox) alertBox.classList.remove('hidden');
         if (btn) btn.classList.remove('loading');
@@ -185,14 +202,15 @@
 
   <!-- SPOTIFY TOPBAR (1:1 Match with Image 1: Spotify logo, Home button, Search pill, Profile avatar 'D') -->
   <header class="spotify-global-topbar" id="spotifyGlobalTopbar">
-    <!-- Left: Spotify Logo + Home Circle Button -->
+    <!-- Left: Dheemafy Logo + Brand Name + Home Circle Button -->
     <div class="topbar-left-controls">
-      <div class="spotify-icon-wrap" title="Spotkify">
-        <img src="/favicon.svg" alt="Spotkify Logo" class="spotkify-topbar-logo" width="36" height="36">
+      <div class="spotify-icon-wrap" title="Dheemafy" id="btnNavBrandHome" data-route="home">
+        <img src="/favicon.png" alt="Dheemafy Logo" class="spotkify-topbar-logo" width="38" height="38">
+        <span class="dheemafy-brand-name">Dheemafy</span>
       </div>
       <button class="topbar-home-btn active" id="btnNavHome" data-route="home" title="Home">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-          <path d="M12.5 3.247a1 1 0 0 0-1 0L4 7.577V20h4.5v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v6H20V7.577l-7.5-4.33z"/>
+          <path d="M12.5 3.247a1 1 0 0 0-1 0L4 7.577V20h4.5v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v6H20V7.577l-7.5-4.33z" />
         </svg>
       </button>
     </div>
@@ -201,13 +219,16 @@
     <div class="topbar-center-search">
       <div class="main-search-wrap" id="mainSearchWrap">
         <svg class="search-input-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-          <path d="M10.57 3a7.5 7.5 0 1 0 4.7 13.342l4.98 4.981a1 1 0 0 0 1.414-1.415l-4.98-4.98A7.5 7.5 0 0 0 10.57 3zm-5.5 7.5a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0z"/>
+          <path
+            d="M10.57 3a7.5 7.5 0 1 0 4.7 13.342l4.98 4.981a1 1 0 0 0 1.414-1.415l-4.98-4.98A7.5 7.5 0 0 0 10.57 3zm-5.5 7.5a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0z" />
         </svg>
-        <input type="text" id="spotifySearchInput" placeholder="What do you want to play?" autocomplete="off" spellcheck="false">
+        <input type="text" id="spotifySearchInput" placeholder="What do you want to play?" autocomplete="off"
+          spellcheck="false">
         <button class="clear-search-btn hidden" id="btnClearSearch">✕</button>
         <div class="search-browse-box-icon" id="btnNavSearch" data-route="search" title="Browse">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1 2v6h14V5H5zm14 8H5v6h14v-6z"/>
+            <path
+              d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1 2v6h14V5H5zm14 8H5v6h14v-6z" />
           </svg>
         </div>
       </div>
@@ -221,11 +242,14 @@
 
     <!-- Right: Default Profile Avatar (User silhouette) -->
     <div class="topbar-right-profile" id="profileMenuContainer">
-      <div class="profile-backdrop hidden" id="profileDropdownBackdrop"></div>
-      <div class="profile-avatar-pill" id="btnProfileMenu" title="Profile">
+      <div class="profile-backdrop hidden" id="profileDropdownBackdrop"
+        onclick="window.spotkifyToggleProfile && window.spotkifyToggleProfile(event)"></div>
+      <div class="profile-avatar-pill" id="btnProfileMenu" title="Profile"
+        onclick="window.spotkifyToggleProfile && window.spotkifyToggleProfile(event)">
         <div class="profile-avatar-circle" id="profileAvatarCircle">
           <svg class="default-avatar-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            <path
+              d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
           </svg>
         </div>
       </div>
@@ -235,9 +259,11 @@
           <strong class="user-handle">Sharu</strong>
         </div>
         <div class="profile-divider"></div>
-        <button class="dropdown-item logout-action" id="btnLogout">
+        <button class="dropdown-item logout-action" id="btnLogout"
+          onclick="window.spotkifyDoLogout && window.spotkifyDoLogout(event)">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zM20 3H9c-1.1 0-2 .9-2 2v4h2V5h11v14H9v-4H7v4c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+            <path
+              d="M16 13v-2H7V8l-5 4 5 4v-3h9zM20 3H9c-1.1 0-2 .9-2 2v4h2V5h11v14H9v-4H7v4c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
           </svg>
           <span>Log out</span>
         </button>
@@ -248,7 +274,7 @@
   <!-- Main 3-Column Grid Wrapper (Left Library - Center Main - Right Now Playing) -->
   <div class="spotify-app">
     <div class="app-main-layout">
-      
+
       <!-- ==========================================================================
            COLUMN 1: LEFT SIDEBAR ("YOUR LIBRARY" - 1:1 MATCH TO IMAGE 1)
            ========================================================================== -->
@@ -258,17 +284,23 @@
           <div class="library-header">
             <button class="library-title-btn" id="btnNavLibrary" data-route="library">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                <path d="M3 22a1 1 0 0 1-1-1V3a1 1 0 0 1 2 0v18a1 1 0 0 1-1 1zM15.5 2.134A1 1 0 0 0 14 3v18a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1.5-.866zM16 20V4l4 2.31V20zM8.5 2.134A1 1 0 0 0 7 3v18a1 1 0 0 0 1.5.866l5-2.887V4.02zM9 18.27V4.73l3 1.73v10.08z"/>
+                <path
+                  d="M3 22a1 1 0 0 1-1-1V3a1 1 0 0 1 2 0v18a1 1 0 0 1-1 1zM15.5 2.134A1 1 0 0 0 14 3v18a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1.5-.866zM16 20V4l4 2.31V20zM8.5 2.134A1 1 0 0 0 7 3v18a1 1 0 0 0 1.5.866l5-2.887V4.02zM9 18.27V4.73l3 1.73v10.08z" />
               </svg>
               <span>Your Library</span>
             </button>
             <div class="library-header-actions">
               <button class="btn-lib-create" id="btnLibraryCreate" title="Create playlist">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                </svg>
                 <span>Create</span>
               </button>
               <button class="icon-btn-header" title="Enlarge your library">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15 3l2.3 2.3-3.89 3.89 1.41 1.41L18.7 6.7 21 9V3h-6zM3 9l2.3-2.3 3.89 3.89 1.41-1.41L6.7 5.3 9 3H3v6zm6 12l-2.3-2.3 3.89-3.89-1.41-1.41L5.3 17.3 3 15v6h6zm12-6l-2.3 2.3-3.89-3.89-1.41 1.41 3.89 3.89L15 21h6v-6z"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path
+                    d="M15 3l2.3 2.3-3.89 3.89 1.41 1.41L18.7 6.7 21 9V3h-6zM3 9l2.3-2.3 3.89 3.89 1.41-1.41L6.7 5.3 9 3H3v6zm6 12l-2.3-2.3 3.89-3.89-1.41-1.41L5.3 17.3 3 15v6h6zm12-6l-2.3 2.3-3.89-3.89-1.41 1.41 3.89 3.89L15 21h6v-6z" />
+                </svg>
               </button>
             </div>
           </div>
@@ -283,13 +315,19 @@
           <div class="library-subbar">
             <div class="library-search-inline-wrap">
               <button class="lib-search-icon-btn" id="btnLibSearchToggle" title="Search">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.57 3a7.5 7.5 0 1 0 4.7 13.342l4.98 4.981a1 1 0 0 0 1.414-1.415l-4.98-4.98A7.5 7.5 0 0 0 10.57 3zm-5.5 7.5a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0z"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path
+                    d="M10.57 3a7.5 7.5 0 1 0 4.7 13.342l4.98 4.981a1 1 0 0 0 1.414-1.415l-4.98-4.98A7.5 7.5 0 0 0 10.57 3zm-5.5 7.5a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0z" />
+                </svg>
               </button>
               <input type="text" id="librarySearchInput" placeholder="Search in Your Library">
             </div>
             <button class="sort-btn">
               <span>Recents</span>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15 15.5l4-4-1.4-1.4-1.6 1.6V3h-2v8.7l-1.6-1.6L11 11.5l4 4zm-6-7L5 12.5l1.4 1.4 1.6-1.6V21h2v-8.7l1.6 1.6L13 12.5l-4-4z"/></svg>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path
+                  d="M15 15.5l4-4-1.4-1.4-1.6 1.6V3h-2v8.7l-1.6-1.6L11 11.5l4 4zm-6-7L5 12.5l1.4 1.4 1.6-1.6V21h2v-8.7l1.6 1.6L13 12.5l-4-4z" />
+              </svg>
             </button>
           </div>
 
@@ -298,87 +336,19 @@
             <!-- 1. Liked Songs -->
             <div class="library-item active" id="itemLikedSongs" data-target="liked">
               <div class="liked-cover-icon">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="#ffffff"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="#ffffff">
+                  <path
+                    d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
               </div>
               <div class="library-item-meta">
                 <span class="library-item-title lib-accent-green">Liked Songs</span>
-                <span class="library-item-sub"><span class="pin-icon" style="color: #1ed760;">📌</span> Playlist • <span id="libLikedCount">7</span> songs</span>
+                <span class="library-item-sub"><span class="pin-icon" style="color: #1ed760;">📌</span> Playlist • <span
+                    id="libLikedCount">0</span> songs</span>
               </div>
             </div>
 
-            <!-- 2. Long Drive Tamil -->
-            <div class="library-item" data-target="pl-long_drive_tamil" data-folder="Long Drive Tamil">
-              <img class="library-item-img" src="/images/playlists/long_drive_tamil.svg" alt="Long Drive Tamil">
-              <div class="library-item-meta">
-                <span class="library-item-title">Long Drive Tamil</span>
-                <span class="library-item-sub">Playlist • 50 songs</span>
-              </div>
-            </div>
-
-            <!-- 3. Happy Vibes Tamil -->
-            <div class="library-item" data-target="pl-happy_vibes_tamil" data-folder="Happy Vibes Tamil">
-              <img class="library-item-img" src="/images/playlists/happy_vibes_tamil.svg" alt="Happy Vibes Tamil">
-              <div class="library-item-meta">
-                <span class="library-item-title">Happy Vibes Tamil</span>
-                <span class="library-item-sub">Playlist • 28 songs</span>
-              </div>
-            </div>
-
-            <!-- 4. Latest Dance Tamil -->
-            <div class="library-item" data-target="pl-latest_dance_tamil" data-folder="Latest Dance Tamil">
-              <img class="library-item-img" src="/images/playlists/latest_dance_tamil.svg" alt="Latest Dance Tamil">
-              <div class="library-item-meta">
-                <span class="library-item-title">Latest Dance Tamil</span>
-                <span class="library-item-sub">Playlist • 42 songs</span>
-              </div>
-            </div>
-
-            <!-- 5. Romantic Anirudh -->
-            <div class="library-item" data-target="pl-romantic_anirudh" data-folder="Romantic Anirudh">
-              <img class="library-item-img" src="/images/playlists/romantic_anirudh.svg" alt="Romantic Anirudh">
-              <div class="library-item-meta">
-                <span class="library-item-title">Romantic Anirudh</span>
-                <span class="library-item-sub">Playlist • 44 songs</span>
-              </div>
-            </div>
-
-            <!-- 6. Tamil Romance -->
-            <div class="library-item" data-target="pl-tamil_romance" data-folder="Tamil Romance">
-              <img class="library-item-img" src="/images/playlists/tamil_romance.svg" alt="Tamil Romance">
-              <div class="library-item-meta">
-                <span class="library-item-title">Tamil Romance</span>
-                <span class="library-item-sub">Playlist • 59 songs</span>
-              </div>
-            </div>
-
-            <!-- 7. Thalapathy Vijay Hits -->
-            <div class="library-item" data-target="pl-thalapathy_vijay_hits" data-folder="Thalapathy Vijay Hits">
-              <img class="library-item-img" src="/images/playlists/thalapathy_vijay_hits.svg" alt="Thalapathy Vijay Hits">
-              <div class="library-item-meta">
-                <span class="library-item-title">Thalapathy Vijay Hits</span>
-                <span class="library-item-sub">Playlist • 70 songs</span>
-              </div>
-            </div>
-
-            <!-- 8. Trending Now Tamil -->
-            <div class="library-item" data-target="pl-trending_now_tamil" data-folder="Trending Now Tamil">
-              <img class="library-item-img" src="/images/playlists/trending_now_tamil.svg" alt="Trending Now Tamil">
-              <div class="library-item-meta">
-                <span class="library-item-title">Trending Now Tamil</span>
-                <span class="library-item-sub">Playlist • 48 songs</span>
-              </div>
-            </div>
-
-            <!-- 8. Master Collection -->
-            <div class="library-item" id="itemAllTracks" data-target="all">
-              <img class="library-item-img" src="/images/playlists/master_collection.svg" alt="Master Collection">
-              <div class="library-item-meta">
-                <span class="library-item-title">Master Collection</span>
-                <span class="library-item-sub">Playlist • <span id="libAllTracksCount">281</span> songs</span>
-              </div>
-            </div>
-
-            <!-- Dynamic Additional Items -->
+            <!-- Dynamic playlists injected here by app.js renderSidebarPlaylists() -->
             <div id="dynamicLibraryList"></div>
           </div>
         </div>
@@ -390,13 +360,13 @@
       <main class="main-panel" id="mainPanel">
         <!-- Scrollable Main View Container -->
         <div class="main-scroll-view" id="mainScrollView">
-          
+
           <!-- Dynamic Hero Ambient Mesh Gradient -->
           <div class="ambient-mesh" id="ambientMesh"></div>
 
           <!-- VIEW 1: HOME VIEW -->
           <div class="view-content active" id="viewHome">
-            
+
             <!-- ==========================================================
                  DESKTOP HOME FLOW (100% Preserved for Laptop/Desktop View)
                  ========================================================== -->
@@ -415,32 +385,50 @@
                   <div class="quick-pick-card" data-song-id="track-jailer">
                     <img class="qp-cover" src="/images/covers/jailer.jpg" alt="Jailer">
                     <span class="qp-title">Jailer (Original Motion Picture Soundtrack)</span>
-                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22"
+                        fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg></button>
                   </div>
                   <div class="quick-pick-card" data-song-id="track-anirudh-rock">
                     <img class="qp-cover" src="/images/playlists/rock_anirudh.jpg" alt="Anirudh Rock">
                     <span class="qp-title">Anirudh Only Rock Songs 🤘</span>
-                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22"
+                        fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg></button>
                   </div>
                   <div class="quick-pick-card" data-song-id="track-enna-solla">
                     <img class="qp-cover" src="/images/covers/enna_solla.jpg" alt="Enna Solla Pogirai">
                     <span class="qp-title">Enna Solla Pogirai</span>
-                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22"
+                        fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg></button>
                   </div>
                   <div class="quick-pick-card" data-song-id="track-vadachennai">
                     <img class="qp-cover" src="/images/covers/vadachennai.svg" alt="VadaChennai">
                     <span class="qp-title">VadaChennai</span>
-                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22"
+                        fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg></button>
                   </div>
                   <div class="quick-pick-card" data-song-id="track-leo">
                     <img class="qp-cover" src="/images/covers/leo.svg" alt="Leo">
                     <span class="qp-title">Leo (Badass)</span>
-                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22"
+                        fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg></button>
                   </div>
                   <div class="quick-pick-card" data-song-id="track-blue-star">
                     <img class="qp-cover" src="/images/covers/blue_star.svg" alt="Blue Star">
                     <span class="qp-title">Blue Star (Railin Oligal)</span>
-                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button class="qp-play-btn" title="Play"><svg viewBox="0 0 24 24" width="22" height="22"
+                        fill="currentColor">
+                        <path d="M8 5v14l11-7z" />
+                      </svg></button>
                   </div>
                 </div>
               </section>
@@ -452,11 +440,17 @@
                   <div class="section-row-header">
                     <h2 class="shelf-title">Getting started</h2>
                     <div class="header-nav-arrows">
-                      <button class="arrow-mini-btn" title="Previous"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.54 21.15L6.46 12.07l9.08-9.08 1.41 1.41-7.66 7.67 7.66 7.67z"/></svg></button>
-                      <button class="arrow-mini-btn" title="Next"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8.46 21.15l-1.41-1.41 7.66-7.67-7.66-7.67 1.41-1.41 9.08 9.08z"/></svg></button>
+                      <button class="arrow-mini-btn" title="Previous"><svg viewBox="0 0 24 24" width="16" height="16"
+                          fill="currentColor">
+                          <path d="M15.54 21.15L6.46 12.07l9.08-9.08 1.41 1.41-7.66 7.67 7.66 7.67z" />
+                        </svg></button>
+                      <button class="arrow-mini-btn" title="Next"><svg viewBox="0 0 24 24" width="16" height="16"
+                          fill="currentColor">
+                          <path d="M8.46 21.15l-1.41-1.41 7.66-7.67-7.66-7.67 1.41-1.41 9.08 9.08z" />
+                        </svg></button>
                     </div>
                   </div>
-                  
+
                   <div class="miniplayer-promo-card" id="miniplayerPromoCard">
                     <div class="promo-left">
                       <h3 class="promo-title">2. Try the Miniplayer</h3>
@@ -493,7 +487,9 @@
                       <div class="card-img-wrap">
                         <img class="card-img" src="/images/playlists/discover_weekly.jpg" alt="Discover Weekly">
                         <button class="card-play-btn" title="Play Discover Weekly">
-                          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
                         </button>
                       </div>
                       <span class="card-title">Discover Weekly</span>
@@ -504,7 +500,9 @@
                       <div class="card-img-wrap">
                         <img class="card-img" src="/images/playlists/daily_mix_1.jpg" alt="Daily Mix 1">
                         <button class="card-play-btn" title="Play Daily Mix 1">
-                          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
                         </button>
                       </div>
                       <span class="card-title">Daily Mix 1</span>
@@ -528,7 +526,10 @@
                   <div class="spotify-card" data-song-id="track-enna-solla">
                     <div class="card-img-wrap">
                       <img class="card-img" src="/images/covers/enna_solla.jpg" alt="Enna Solla Pogirai">
-                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24"
+                          fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg></button>
                     </div>
                     <span class="card-title">Enna Solla Pogirai</span>
                     <span class="card-desc">Shankar Mahadevan</span>
@@ -536,7 +537,10 @@
                   <div class="spotify-card" data-song-id="track-leo">
                     <div class="card-img-wrap">
                       <img class="card-img" src="/images/covers/leo.svg" alt="Leo">
-                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24"
+                          fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg></button>
                     </div>
                     <span class="card-title">Leo (Badass)</span>
                     <span class="card-desc">Anirudh Ravichander</span>
@@ -544,7 +548,10 @@
                   <div class="spotify-card" data-song-id="track-og-sambavam">
                     <div class="card-img-wrap">
                       <img class="card-img" src="/images/covers/og_sambavam.svg" alt="OG Sambavam">
-                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24"
+                          fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg></button>
                     </div>
                     <span class="card-title">OG Sambavam</span>
                     <span class="card-desc">Original Soundtrack</span>
@@ -552,7 +559,10 @@
                   <div class="spotify-card" data-song-id="track-jailer">
                     <div class="card-img-wrap">
                       <img class="card-img" src="/images/covers/jailer.jpg" alt="Jailer">
-                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24"
+                          fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg></button>
                     </div>
                     <span class="card-title">Jailer (Hukum)</span>
                     <span class="card-desc">Anirudh Ravichander</span>
@@ -560,7 +570,10 @@
                   <div class="spotify-card" data-song-id="track-vadachennai">
                     <div class="card-img-wrap">
                       <img class="card-img" src="/images/covers/vadachennai.svg" alt="VadaChennai">
-                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24"
+                          fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg></button>
                     </div>
                     <span class="card-title">VadaChennai</span>
                     <span class="card-desc">Santhosh Narayanan</span>
@@ -568,7 +581,10 @@
                   <div class="spotify-card" data-song-id="track-blue-star">
                     <div class="card-img-wrap">
                       <img class="card-img" src="/images/covers/blue_star.svg" alt="Blue Star">
-                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+                      <button class="card-play-btn" title="Play"><svg viewBox="0 0 24 24" width="24" height="24"
+                          fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg></button>
                     </div>
                     <span class="card-title">Blue Star</span>
                     <span class="card-desc">Govind Vasantha</span>
@@ -649,7 +665,7 @@
                 <div class="shelf-header">
                   <div>
                     <span class="shelf-superhead">Curated from folders</span>
-                    <h2 class="shelf-title">Cloudinary Playlists</h2>
+                    <h2 class="shelf-title">Dheemafy Playlists</h2>
                   </div>
                   <button class="show-all-link" id="mobileBtnShowAllPlaylists">Show all</button>
                 </div>
@@ -696,27 +712,38 @@
           <div class="view-content" id="viewPlaylist">
             <div class="playlist-header" id="playlistHeader">
               <div class="playlist-cover-wrap">
-                <img id="playlistCoverImg" src="/images/covers/kanaa.jpg" alt="Playlist Cover">
+                <img id="playlistCoverImg" src="/images/covers/kanaa.jpg" alt="Playlist Cover"
+                  onerror="this.onerror=null; this.src='/images/default_cover.svg';">
               </div>
               <div class="playlist-info">
                 <span class="playlist-type" id="playlistType">Public Playlist</span>
                 <h1 class="playlist-title" id="playlistTitle">Cloudinary Audio Collection</h1>
                 <p class="playlist-desc" id="playlistDesc">All master recordings uploaded to Cloudinary.</p>
                 <div class="playlist-meta">
-                  <span class="bold-author">Spotkify</span> • <span id="playlistTrackCount">0 songs</span>, <span id="playlistTotalDuration">0 min</span>
+                  <span class="bold-author">Dheemafy</span> • <span id="playlistTrackCount">0 songs</span>, <span
+                    id="playlistTotalDuration">0 min</span>
                 </div>
               </div>
             </div>
 
             <div class="playlist-action-bar">
               <button class="big-play-btn" id="btnBigPlay" title="Play Playlist">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
               </button>
               <button class="action-circle-btn" id="btnPlaylistHeart" title="Save to Your Library">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path
+                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z">
+                  </path>
+                </svg>
               </button>
               <button class="action-circle-btn" id="btnShufflePlaylist" title="Shuffle Play">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                  <path
+                    d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                </svg>
               </button>
             </div>
 
@@ -727,7 +754,10 @@
                 <span class="th-col th-album">Album</span>
                 <span class="th-col th-date">Date added</span>
                 <span class="th-col th-time">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path
+                      d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+                  </svg>
                 </span>
               </div>
               <div class="table-body" id="playlistTrackRows"></div>
@@ -778,7 +808,10 @@
                 </div>
               </div>
               <div class="search-full-table-wrap">
-                <h3 class="search-section-title">Matching Tracks</h3>
+                <h3 class="search-section-title">
+                  <span class="desktop-only-heading">Matching Tracks</span>
+                  <span class="mobile-only-heading">Songs</span>
+                </h3>
                 <div class="table-body" id="searchTableRows"></div>
               </div>
             </div>
@@ -791,7 +824,8 @@
               <div class="artist-hero-content">
                 <div class="verified-badge-row">
                   <svg class="verified-icon" viewBox="0 0 24 24" width="24" height="24" fill="#3d91f4">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    <path
+                      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                   </svg>
                   <span>Verified Artist</span>
                 </div>
@@ -802,7 +836,9 @@
 
             <div class="artist-action-bar">
               <button class="big-play-btn" id="btnArtistPlayAll" title="Play Artist Songs">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
               </button>
               <button class="artist-follow-btn" id="btnArtistFollow">Following</button>
             </div>
@@ -816,7 +852,10 @@
                   <div class="th-album">Album / Movie</div>
                   <div class="th-date">Date Added</div>
                   <div class="th-time">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm1-13h-2v6h6v-2h-4z"/></svg>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                      <path
+                        d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm1-13h-2v6h6v-2h-4z" />
+                    </svg>
                   </div>
                 </div>
                 <div class="table-body" id="artistTrackRows"></div>
@@ -836,10 +875,16 @@
           <span class="right-header-title" id="rightHeaderTitle">Best Love feeling songs 🥺... ✨</span>
           <div class="right-header-actions">
             <button class="icon-btn-header" id="rightBtnMore" title="More options">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path
+                  d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+              </svg>
             </button>
             <button class="icon-btn-header" id="rightBtnExpand" title="Expand view">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15 3l2.3 2.3-3.89 3.89 1.41 1.41L18.7 6.7 21 9V3h-6zM3 9l2.3-2.3 3.89 3.89 1.41-1.41L6.7 5.3 9 3H3v6zm6 12l-2.3-2.3 3.89-3.89-1.41-1.41L5.3 17.3 3 15v6h6zm12-6l-2.3 2.3-3.89-3.89-1.41 1.41 3.89 3.89L15 21h6v-6z"/></svg>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path
+                  d="M15 3l2.3 2.3-3.89 3.89 1.41 1.41L18.7 6.7 21 9V3h-6zM3 9l2.3-2.3 3.89 3.89 1.41-1.41L6.7 5.3 9 3H3v6zm6 12l-2.3-2.3 3.89-3.89-1.41-1.41L5.3 17.3 3 15v6h6zm12-6l-2.3 2.3-3.89-3.89-1.41 1.41 3.89 3.89L15 21h6v-6z" />
+              </svg>
             </button>
           </div>
         </div>
@@ -848,7 +893,8 @@
         <div class="right-sidebar-scroll" id="rightSidebarScroll">
           <!-- Large Artwork Box (Image 1: Enna Solla Pogirai) -->
           <div class="right-cover-wrap">
-            <img id="rightCoverImg" src="/images/covers/enna_solla.jpg" alt="Now Playing">
+            <img id="rightCoverImg" src="/images/covers/enna_solla.jpg" alt="Now Playing"
+              onerror="this.onerror=null; this.src='/images/default_cover.svg';">
           </div>
 
           <!-- Track Name, Artist, and Action Icons -->
@@ -859,10 +905,17 @@
             </div>
             <div class="right-track-actions">
               <button class="icon-btn-action" id="rightBtnShare" title="Share track">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <path
+                    d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z" />
+                </svg>
               </button>
               <button class="icon-btn-action" id="rightBtnAdd" title="Save to Liked Songs">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="16"></line>
+                  <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
               </button>
             </div>
           </div>
@@ -889,7 +942,8 @@
               <button class="right-credits-show-all" id="btnOpenFullQueue">Open queue</button>
             </div>
             <div class="queue-mini-item" id="nextQueueRow">
-              <img class="row-thumb" src="/images/covers/jailer.jpg" alt="Next Track">
+              <img class="row-thumb" src="/images/covers/jailer.jpg" alt="Next Track"
+                onerror="this.onerror=null; this.src='/images/default_cover.svg';">
               <div class="row-text">
                 <span class="row-song-title">Tiger Ka Hukum</span>
                 <span class="row-artist-name">Anirudh Ravichander</span>
@@ -908,7 +962,8 @@
       <!-- Left Track Section -->
       <div class="player-left">
         <div class="player-thumb-wrap">
-          <img id="barThumb" src="/images/covers/enna_solla.jpg" alt="Track Cover" onerror="this.onerror=null; this.src='/images/covers/kanaa.jpg'">
+          <img id="barThumb" src="/images/covers/enna_solla.jpg" alt="Track Cover"
+            onerror="this.onerror=null; this.src='/images/default_cover.svg';">
           <div class="soundwave-indicator hidden" id="soundwaveIndicator">
             <span></span><span></span><span></span><span></span>
           </div>
@@ -933,30 +988,43 @@
         <!-- Mobile Controls in Mini Bar -->
         <div class="mobile-player-actions">
           <button class="mobile-connect-btn" id="mobileConnectBtn" title="Connect to a device">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#1ed760" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#1ed760" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+              <path
+                d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z">
+              </path>
             </svg>
           </button>
           <button class="mobile-add-btn" id="mobileAddBtn" title="Add to Playlist">
-            <svg id="mobileAddSvgPlus" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <svg id="mobileAddSvgPlus" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="12" y1="8" x2="12" y2="16"></line>
               <line x1="8" y1="12" x2="16" y2="12"></line>
             </svg>
             <svg id="mobileAddSvgCheck" class="hidden" viewBox="0 0 24 24" width="22" height="22" fill="#1ed760">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
             </svg>
           </button>
           <button class="mobile-mini-prev-btn" id="mobileMiniPrevBtn" title="Previous track">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+            </svg>
           </button>
           <button class="mobile-mini-play-btn" id="mobileMiniPlayBtn" title="Play / Pause">
-            <svg id="mobileBarPlaySvg" viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <svg id="mobileBarPauseSvg" class="hidden" viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            <svg id="mobileBarPlaySvg" viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            <svg id="mobileBarPauseSvg" class="hidden" viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            </svg>
           </button>
           <button class="mobile-mini-next-btn" id="mobileMiniNextBtn" title="Next track">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+            </svg>
           </button>
         </div>
       </div>
@@ -965,20 +1033,33 @@
       <div class="player-center">
         <div class="player-control-buttons">
           <button class="control-btn" id="barBtnShuffle" title="Enable shuffle">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path
+                d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+            </svg>
           </button>
           <button class="control-btn" id="barBtnPrev" title="Previous">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+            </svg>
           </button>
           <button class="play-pause-circle" id="barBtnPlayPause" title="Play">
-            <svg id="barPlaySvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            <svg id="barPauseSvg" class="hidden" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            <svg id="barPlaySvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            <svg id="barPauseSvg" class="hidden" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            </svg>
           </button>
           <button class="control-btn" id="barBtnNext" title="Next">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+            </svg>
           </button>
-          <button class="control-btn" id="barBtnRepeat" title="Enable repeat">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+          <button class="control-btn" id="barBtnRepeat" title="Enable repeat all">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+            </svg>
           </button>
         </div>
 
@@ -998,18 +1079,32 @@
       <!-- Right Controls Section (Image 1: Mic, Queue, Connect, Volume, Miniplayer, Fullscreen) -->
       <div class="player-right">
         <button class="control-btn" id="btnLyrics" title="Lyrics">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z" />
+          </svg>
         </button>
         <button class="control-btn" id="btnToggleQueue" title="Queue">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path
+              d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+          </svg>
         </button>
         <button class="control-btn" id="btnToggleNowPlaying" title="Now playing view">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1 2v14h14V5H5z"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1 2v14h14V5H5z" />
+          </svg>
         </button>
         <div class="volume-container">
           <button class="control-btn" id="barBtnMute" title="Mute">
-            <svg id="volSvgHigh" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-            <svg id="volSvgMute" class="hidden" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+            <svg id="volSvgHigh" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path
+                d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+            </svg>
+            <svg id="volSvgMute" class="hidden" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path
+                d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+            </svg>
           </button>
           <div class="spotify-volume-bar" id="volBar">
             <div class="volume-track">
@@ -1019,7 +1114,9 @@
           </div>
         </div>
         <button class="control-btn" id="btnFullscreen" title="Full screen">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+          </svg>
         </button>
       </div>
 
@@ -1034,24 +1131,27 @@
   <nav class="mobile-bottom-nav">
     <button class="mobile-nav-item active" data-route="home" id="mNavHome">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-        <path d="M12.5 3.247a1 1 0 0 0-1 0L4 7.577V20h4.5v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v6H20V7.577l-7.5-4.33z"/>
+        <path d="M12.5 3.247a1 1 0 0 0-1 0L4 7.577V20h4.5v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v6H20V7.577l-7.5-4.33z" />
       </svg>
       <span>Home</span>
     </button>
     <button class="mobile-nav-item" data-route="search" id="mNavSearch">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-        <path d="M10.57 3a7.5 7.5 0 1 0 4.7 13.342l4.98 4.981a1 1 0 0 0 1.414-1.415l-4.98-4.98A7.5 7.5 0 0 0 10.57 3zm-5.5 7.5a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0z"/>
+        <path
+          d="M10.57 3a7.5 7.5 0 1 0 4.7 13.342l4.98 4.981a1 1 0 0 0 1.414-1.415l-4.98-4.98A7.5 7.5 0 0 0 10.57 3zm-5.5 7.5a5.5 5.5 0 1 1 11 0 5.5 5.5 0 0 1-11 0z" />
       </svg>
       <span>Search</span>
     </button>
     <button class="mobile-nav-item" data-route="library" id="mNavLibrary">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-        <path d="M3 22a1 1 0 0 1-1-1V3a1 1 0 0 1 2 0v18a1 1 0 0 1-1 1zM15.5 2.134A1 1 0 0 0 14 3v18a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1.5-.866zM16 20V4l4 2.31V20zM8.5 2.134A1 1 0 0 0 7 3v18a1 1 0 0 0 1.5.866l5-2.887V4.02zM9 18.27V4.73l3 1.73v10.08z"/>
+        <path
+          d="M3 22a1 1 0 0 1-1-1V3a1 1 0 0 1 2 0v18a1 1 0 0 1-1 1zM15.5 2.134A1 1 0 0 0 14 3v18a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1.5-.866zM16 20V4l4 2.31V20zM8.5 2.134A1 1 0 0 0 7 3v18a1 1 0 0 0 1.5.866l5-2.887V4.02zM9 18.27V4.73l3 1.73v10.08z" />
       </svg>
       <span>Your Library</span>
     </button>
     <button class="mobile-nav-item" data-route="create" id="mNavCreate">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
       </svg>
@@ -1066,7 +1166,10 @@
       <div class="sheet-handle-bar"></div>
       <div class="sheet-header">
         <div class="sheet-title-group">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="#1ed760"><path d="M12 2C6.48 2 2 6.48 2 12v6a3 3 0 0 0 3 3h2v-8H4v-1c0-4.41 3.59-8 8-8s8 3.59 8 8v1h-3v8h2a3 3 0 0 0 3-3v-6c0-5.52-4.48-10-10-10z"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="#1ed760">
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12v6a3 3 0 0 0 3 3h2v-8H4v-1c0-4.41 3.59-8 8-8s8 3.59 8 8v1h-3v8h2a3 3 0 0 0 3-3v-6c0-5.52-4.48-10-10-10z" />
+          </svg>
           <h3>Connect to a device</h3>
         </div>
         <button class="sheet-close-btn" id="btnCloseDeviceSheet">✕</button>
@@ -1084,11 +1187,13 @@
             </div>
             <div class="device-check">✓</div>
           </div>
-          <div class="device-item" data-device="Spotkify Web Player">
+          <div class="device-item" data-device="Dheemafy Web Player">
             <div class="device-item-left">
-              <svg class="device-item-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M4 6h16v10H4zM2 4v14h20V4H2zm0 16h20v2H2z"/></svg>
+              <svg class="device-item-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M4 6h16v10H4zM2 4v14h20V4H2zm0 16h20v2H2z" />
+              </svg>
               <div class="device-item-meta">
-                <span class="device-name">Spotkify Web Player</span>
+                <span class="device-name">Dheemafy Web Player</span>
                 <span class="device-status">This device (Internal speakers)</span>
               </div>
             </div>
@@ -1096,10 +1201,13 @@
           </div>
           <div class="device-item" data-device="Living Room TV">
             <div class="device-item-left">
-              <svg class="device-item-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+              <svg class="device-item-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path
+                  d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z" />
+              </svg>
               <div class="device-item-meta">
                 <span class="device-name">Living Room TV</span>
-                <span class="device-status">Spotkify Connect • Google Cast</span>
+                <span class="device-status">Dheemafy Connect • Google Cast</span>
               </div>
             </div>
             <div class="device-check hidden">✓</div>
@@ -1121,7 +1229,10 @@
       <div class="create-options-list">
         <div class="create-option-item" id="btnCreateNewPlaylist">
           <div class="create-icon-box">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path
+                d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+            </svg>
           </div>
           <div class="create-meta">
             <span class="create-title">Playlist</span>
@@ -1130,7 +1241,10 @@
         </div>
         <div class="create-option-item" id="btnCreateBlend">
           <div class="create-icon-box">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path
+                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
           </div>
           <div class="create-meta">
             <span class="create-title">Blend</span>
@@ -1147,7 +1261,8 @@
     <div class="sheet-content">
       <div class="sheet-handle-bar"></div>
       <div class="track-context-header">
-        <img id="contextTrackCover" src="" alt="Cover" class="context-cover-img">
+        <img id="contextTrackCover" src="/images/default_cover.svg" alt="Cover" class="context-cover-img"
+          onerror="this.onerror=null; this.src='/images/default_cover.svg';">
         <div class="context-track-meta">
           <span class="context-track-title" id="contextTrackTitle">Track Title</span>
           <span class="context-track-artist" id="contextTrackArtist">Artist</span>
@@ -1155,19 +1270,31 @@
       </div>
       <div class="context-menu-list">
         <button class="context-item" id="btnContextLike">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
           <span id="btnContextLikeText">Add to Liked Songs</span>
         </button>
         <button class="context-item" id="btnContextAddToPlaylist">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+          </svg>
           <span>Add to playlist</span>
         </button>
         <button class="context-item" id="btnContextViewArtist">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+          </svg>
           <span>View artist</span>
         </button>
         <button class="context-item" id="btnContextShare">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z" />
+          </svg>
           <span>Share</span>
         </button>
       </div>
@@ -1178,35 +1305,45 @@
   <div class="fullscreen-player-modal hidden" id="fullscreenModal">
     <div class="fullscreen-backdrop" id="fsBackdrop"></div>
     <div class="fullscreen-overlay-gradient"></div>
-    
+
     <!-- Top Header Bar -->
     <div class="fullscreen-top">
       <button class="icon-btn fs-collapse-btn" id="btnCloseFullscreen" title="Close player" aria-label="Close player">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+          <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+        </svg>
       </button>
       <div class="fs-header-context">
         <span class="fs-header-sub" id="fsHeaderContextSub">Playing from Search</span>
         <span class="fs-header-title" id="fsHeaderPlaylistName">"neelothi" in Search</span>
       </div>
       <button class="icon-btn fs-more-btn" id="fsBtnMore" title="More options" aria-label="More options">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path
+            d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+        </svg>
       </button>
     </div>
 
-    <!-- Center Canvas / Floating Live Lyrics (Image 2) -->
+    <!-- Center Canvas / Main Artwork Area -->
     <div class="fs-canvas-area" id="fsCanvasArea">
-      <div class="fs-floating-lyrics" id="fsFloatingLyrics">
-        <p class="fs-floating-text" id="fsFloatingLyric">en uchurul enduheen-enduheen</p>
-      </div>
+      <img
+        class="fs-main-artwork"
+        id="fsCoverImg"
+        src="/images/default_cover.svg"
+        alt="Album artwork"
+        onerror="this.onerror=null; this.src='/images/default_cover.svg';"
+      >
     </div>
 
-    <!-- Bottom Dock: Track Row, Scrubber, Controls, Device, and Peeking Lyrics -->
+    <!-- Bottom Dock: Track Row, Scrubber, Controls, Device -->
     <div class="fs-bottom-dock">
       <!-- Track Meta Row: Mini Thumbnail + Song/Artist + Like (+) Button -->
       <div class="fs-meta-row">
         <div class="fs-meta-left">
           <div class="fs-thumb-wrap">
-            <img class="fs-thumb-img" id="fsThumbImg" src="/images/covers/enna_solla.jpg" alt="Album artwork">
+            <img class="fs-thumb-img" id="fsThumbImg" src="/images/covers/enna_solla.jpg" alt="Album artwork"
+              onerror="this.onerror=null; this.src='/images/default_cover.svg';">
           </div>
           <div class="fs-meta-info">
             <h2 class="fs-track-title" id="fsTrackTitle">Neelothi (From "Sirai")</h2>
@@ -1214,13 +1351,15 @@
           </div>
         </div>
         <button class="fs-add-btn" id="fsBtnAdd" title="Save to Liked Songs" aria-label="Save to Liked Songs">
-          <svg id="fsAddSvgPlus" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg id="fsAddSvgPlus" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="16"></line>
             <line x1="8" y1="12" x2="16" y2="12"></line>
           </svg>
           <svg id="fsAddSvgCheck" class="hidden" viewBox="0 0 24 24" width="28" height="28" fill="#1ed760">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
           </svg>
         </button>
       </div>
@@ -1242,21 +1381,33 @@
       <!-- Playback Controls Row (Shuffle, Prev, Big Play, Next, Sleep Timer) -->
       <div class="fs-controls-row">
         <button class="fs-ctrl-btn fs-shuffle-btn" id="fsBtnShuffle" title="Shuffle" aria-label="Shuffle">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <path
+              d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+          </svg>
           <span class="fs-shuffle-dot" id="fsShuffleDot"></span>
         </button>
         <button class="fs-ctrl-btn fs-prev-btn" id="fsBtnPrev" title="Previous track" aria-label="Previous track">
-          <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+          </svg>
         </button>
         <button class="fs-play-circle" id="fsBtnPlayPause" title="Play" aria-label="Play or Pause">
-          <svg id="fsPlaySvg" viewBox="0 0 24 24" width="32" height="32" fill="#000"><path d="M8 5v14l11-7z"/></svg>
-          <svg id="fsPauseSvg" class="hidden" viewBox="0 0 24 24" width="32" height="32" fill="#000"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          <svg id="fsPlaySvg" viewBox="0 0 24 24" width="32" height="32" fill="#000">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg id="fsPauseSvg" class="hidden" viewBox="0 0 24 24" width="32" height="32" fill="#000">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
         </button>
         <button class="fs-ctrl-btn fs-next-btn" id="fsBtnNext" title="Next track" aria-label="Next track">
-          <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+          </svg>
         </button>
         <button class="fs-ctrl-btn fs-timer-btn" id="fsBtnTimer" title="Sleep timer" aria-label="Sleep timer">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="13" r="8"></circle>
             <path d="M12 9v4l2.5 2.5"></path>
             <path d="M5 3L2 6"></path>
@@ -1274,7 +1425,8 @@
         </div>
         <div class="fs-footer-actions">
           <button class="fs-footer-action-btn" id="fsBtnShare" title="Share track" aria-label="Share track">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
               <circle cx="18" cy="5" r="3"></circle>
               <circle cx="6" cy="12" r="3"></circle>
               <circle cx="18" cy="19" r="3"></circle>
@@ -1283,22 +1435,13 @@
             </svg>
           </button>
           <button class="fs-footer-action-btn" id="fsBtnQueue" title="Queue" aria-label="Queue">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
               <line x1="4" y1="6" x2="20" y2="6"></line>
               <line x1="4" y1="12" x2="20" y2="12"></line>
               <line x1="4" y1="18" x2="13" y2="18"></line>
             </svg>
           </button>
-        </div>
-      </div>
-
-      <!-- Bottom Peeking Lyrics Card (Image 2: Maroon background with Lyrics preview) -->
-      <div class="fs-lyrics-peek-card" id="fsLyricsPeekCard">
-        <div class="fs-lyrics-peek-header">
-          <span class="fs-lyrics-peek-title">Lyrics preview</span>
-        </div>
-        <div class="fs-lyrics-peek-body">
-          <p class="fs-lyrics-peek-text" id="fsLyricsPeekText">en niloti, niloti...<br><span class="highlight">en uchurul enduheen-enduheen</span></p>
         </div>
       </div>
     </div>
@@ -1310,6 +1453,7 @@
   <!-- TOAST NOTIFICATIONS -->
   <div class="spotify-toast-container" id="toastContainer"></div>
 
-  <script src="app.js?v=4.0"></script>
+  <script src="app.js?v=5.0"></script>
 </body>
+
 </html>

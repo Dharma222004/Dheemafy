@@ -1,7 +1,7 @@
 {
-  "name": "spotkify-backend",
+  "name": "dheemafy",
   "version": "1.0.0",
-  "description": "Spotify-inspired music streaming application using Cloudinary and SQLite",
+  "description": "Dheemafy - Music streaming application using Cloudinary and SQLite",
   "main": "server/index.js",
   "type": "commonjs",
   "scripts": {

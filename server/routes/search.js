@@ -60,8 +60,8 @@ router.get('/', (req, res) => {
 
   // 2. Search Songs (By title, any credited artist, album, movie)
   const songsRaw = db.prepare(`
-    SELECT DISTINCT m.id, m.title, m.artist, m.artists_json, m.album, m.movie, m.duration,
-      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+    SELECT DISTINCT m.id, m.title, m.artist, m.artists_json, m.album, m.album_artist, m.movie, m.duration,
+      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language, m.folder,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
     WHERE (

@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "runtime": "nodejs22.x",
   "rewrites": [
     {
       "source": "/api/(.*)",

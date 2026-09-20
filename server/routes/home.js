@@ -31,8 +31,8 @@ router.get('/', async (req, res) => {
 
   // 1. Quick picks / Recently Played
   const recentlyPlayedRaw = db.prepare(`
-    SELECT DISTINCT m.id, m.title, m.artist, m.artists_json, m.album, m.movie, m.duration, m.cover_image_url,
-      m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+    SELECT DISTINCT m.id, m.title, m.artist, m.artists_json, m.album, m.album_artist, m.movie, m.duration,
+      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language, m.folder,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM scrobbles s
     JOIN media_file m ON s.media_file_id = m.id
@@ -42,8 +42,8 @@ router.get('/', async (req, res) => {
   `).all(userId, userId);
 
   const fallbackQuickPicksRaw = db.prepare(`
-    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.movie, m.duration, m.cover_image_url,
-      m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.album_artist, m.movie, m.duration,
+      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language, m.folder,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
     WHERE m.is_active = 1 OR m.is_active IS NULL
@@ -55,8 +55,8 @@ router.get('/', async (req, res) => {
 
   // 2. Trending songs
   const trendingRaw = db.prepare(`
-    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.movie, m.duration, m.cover_image_url,
-      m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.album_artist, m.movie, m.duration,
+      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language, m.folder,
       COALESCE((SELECT SUM(play_count) FROM annotation WHERE item_id = m.id), 0) AS play_count,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
@@ -69,8 +69,8 @@ router.get('/', async (req, res) => {
 
   // 3. Tamil Hits
   const tamilHitsRaw = db.prepare(`
-    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.movie, m.duration, m.cover_image_url,
-      m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.album_artist, m.movie, m.duration,
+      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language, m.folder,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
     WHERE (LOWER(m.language) = 'tamil' OR LOWER(m.genre) LIKE '%tamil%')
@@ -82,8 +82,8 @@ router.get('/', async (req, res) => {
 
   // 4. New Additions
   const newAdditionsRaw = db.prepare(`
-    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.movie, m.duration, m.cover_image_url,
-      m.audio_url, m.cloudinary_public_id, m.genre, m.language,
+    SELECT m.id, m.title, m.artist, m.artists_json, m.album, m.album_artist, m.movie, m.duration,
+      m.cover_image_url, m.audio_url, m.cloudinary_public_id, m.genre, m.language, m.folder,
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
     WHERE m.is_active = 1 OR m.is_active IS NULL

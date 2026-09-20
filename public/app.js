@@ -4,17 +4,55 @@
 (function () {
   'use strict';
 
+  // Default Fallback Cover
+  const DEFAULT_SONG_COVER = '/images/default_cover.svg';
+
   // State
   let allSongs = [];
   let homeData = null;
-  let currentPlaylist = [];
-  let currentTrackIndex = -1;
+
+  // currentPlaylist = the playlist currently being BROWSED (shown in playlist view / row highlighting)
+  // activePlaybackPlaylist = the playlist actually DRIVING PLAYBACK (next/prev/auto-advance)
+  // These are kept separate so that browsing a new playlist does not hijack the active queue.
+  let currentPlaylist = [];       // browsing context
+  let activePlaybackPlaylist = []; // playback engine context
+
+  let currentTrackIndex = -1;     // index within activePlaybackPlaylist
   let isPlaying = false;
   let isShuffle = false;
-  let isRepeat = false;
+
+  // repeatMode: 'off' | 'all' | 'one'
+  // 'off' → stop at end of playlist
+  // 'all' → loop the entire playlist
+  // 'one' → replay the current song
+  let repeatMode = 'off';
+
   let currentRoute = 'home';
   let queue = [];
   let isRightPanelOpen = false;
+  let shuffleQueue = [];
+  let shuffleIndex = 0;
+  // Version counter incremented each time the activePlaybackPlaylist changes.
+  // Prevents shuffle queue from regenerating on trivial length matches.
+  let shufflePlaylistVersion = 0;
+  let shuffleQueueVersion = -1;   // version when shuffleQueue was last generated
+
+  // Stall watchdog: tracks the last time audio.timeupdate fired while playing
+  let _lastTimeUpdateAt = 0;
+  let _stallWatchdogTimer = null;
+
+  function generateShuffleOrder(length, currentIdx = 0) {
+    if (length <= 1) return [0];
+    const indices = [];
+    for (let i = 0; i < length; i++) {
+      if (i !== currentIdx) indices.push(i);
+    }
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    return [currentIdx, ...indices];
+  }
 
   // Audio Engine
   const audio = document.getElementById('spotifyAudioEngine');
@@ -50,7 +88,7 @@
           link.as = 'audio';
           document.head.appendChild(link);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Pre-warms upcoming songs in the current queue sequentially
@@ -64,7 +102,7 @@
             preloadTrack(playlist[nextIdx]);
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     return {
@@ -128,43 +166,69 @@
   const mobileTrendingCarousel = document.getElementById('mobileTrendingCarousel');
   const mobileBtnShowAllTrending = document.getElementById('mobileBtnShowAllTrending');
 
-  const CLOUDINARY_PLAYLISTS_ORDER = [
-    'Happy Vibes Tamil',
-    'Latest Dance Tamil',
-    'Long Drive Tamil',
-    'Romantic Anirudh',
-    'Tamil Romance',
-    'Thalapathy Vijay Hits',
-    'Trending Now Tamil'
+  // ==========================================================================
+  // NEW FIXED PLAYLIST ORDER (as per app requirements)
+  // 1. All Songs – entire library alphabetically
+  // 2. Sharu – songs matching artist "Sharu"
+  // 3. Hills – songs matching artist/folder "Hills"
+  // 4. Anirudh – songs by Anirudh Ravichander
+  // 5. A.R Rahman – songs by A.R. Rahman
+  // 6. Sid Sriram – songs by Sid Sriram
+  // 7. Other Artists – songs not matched by the above 5 specific artists
+  // After these, KNOWN_MUSIC_DIRECTORS artist playlists follow dynamically.
+  // ==========================================================================
+  const PLAYLIST_DEFINITIONS = [
+    { id: 'pl-all-songs', name: 'All Songs', type: 'all', cover: '/images/playlists/all_songs.svg' },
+    { id: 'pl-sharu', name: 'Sharu', type: 'folder', folder: 'sharu', cover: '/images/playlists/sharu.svg' },
+    { id: 'pl-hills', name: 'Hills', type: 'folder', folder: 'hills', cover: '/images/playlists/hills.svg' },
+    { id: 'pl-anirudh', name: 'Anirudh', type: 'artist', cover: '/images/artists/anirudh.jpg', aliases: ['anirudh ravichander', 'anirudh'] },
+    { id: 'pl-arrahman', name: 'A.R Rahman', type: 'artist', cover: DEFAULT_SONG_COVER, aliases: ['a.r. rahman', 'a. r. rahman', 'ar rahman', 'rahman'] },
+    { id: 'pl-sidsriram', name: 'Sid Sriram', type: 'artist', cover: DEFAULT_SONG_COVER, aliases: ['sid sriram'] },
+    { id: 'pl-other', name: 'Other Artists', type: 'other', cover: DEFAULT_SONG_COVER }
   ];
 
   const KNOWN_MUSIC_DIRECTORS = [
-    { name: 'A.R. Rahman', aliases: ['a.r. rahman', 'a. r. rahman', 'ar rahman', 'rahman'], cover: 'https://upload.wikimedia.org/wikipedia/commons/1/10/AR_Rahman_at_Premier_Futsal_Press_Meet_%28cropped%29.jpg' },
+    { name: 'A.R. Rahman', aliases: ['a.r. rahman', 'a. r. rahman', 'ar rahman', 'rahman'], cover: DEFAULT_SONG_COVER },
     { name: 'Anirudh Ravichander', aliases: ['anirudh ravichander', 'anirudh'], cover: '/images/artists/anirudh.jpg' },
     { name: 'D. Imman', aliases: ['d. imman', 'd imman', 'imman'], cover: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=600&auto=format&fit=crop&q=80' },
     { name: 'Darbuka Siva', aliases: ['darbuka siva'], cover: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80' },
-    { name: 'Deva', aliases: ['deva', 'thenisai thendral deva'], cover: 'https://upload.wikimedia.org/wikipedia/commons/8/80/Hiphop_Tamizha_Aambala_audio_launch_%28cropped%29.jpg' },
+    { name: 'Deva', aliases: ['deva', 'thenisai thendral deva'], cover: DEFAULT_SONG_COVER },
     { name: 'Devi Sri Prasad', aliases: ['devi sri prasad', 'dsp'], cover: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&auto=format&fit=crop&q=80' },
     { name: 'Dhibu Ninan Thomas', aliases: ['dhibu ninan thomas'], cover: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&auto=format&fit=crop&q=80' },
     { name: 'G. V. Prakash Kumar', aliases: ['g. v. prakash kumar', 'g. v. prakash', 'g.v. prakash', 'gv prakash'], cover: '/images/artists/gvprakash.jpg' },
     { name: 'Ghibran', aliases: ['ghibran'], cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80' },
     { name: 'Govind Vasantha', aliases: ['govind vasantha'], cover: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=600&auto=format&fit=crop&q=80' },
-    { name: 'Harris Jayaraj', aliases: ['harris jayaraj'], cover: 'https://upload.wikimedia.org/wikipedia/commons/8/82/Harris_Jayaraj_at_Gethu_Audio_Launch_%28cropped%29.jpg' },
-    { name: 'Hiphop Tamizha', aliases: ['hiphop tamizha', 'hiphop thamizha'], cover: 'https://upload.wikimedia.org/wikipedia/commons/8/80/Hiphop_Tamizha_Aambala_audio_launch_%28cropped%29.jpg' },
-    { name: 'Ilaiyaraaja', aliases: ['ilaiyaraaja', 'ilayaraja'], cover: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Ilaiyaraaja_at_Merku_Thodarchi_Malai_Press_Meet_%28cropped%29.jpg' },
+    { name: 'Harris Jayaraj', aliases: ['harris jayaraj'], cover: DEFAULT_SONG_COVER },
+    { name: 'Hiphop Tamizha', aliases: ['hiphop tamizha', 'hiphop thamizha'], cover: DEFAULT_SONG_COVER },
+    { name: 'Ilaiyaraaja', aliases: ['ilaiyaraaja', 'ilayaraja'], cover: DEFAULT_SONG_COVER },
     { name: 'Leon James', aliases: ['leon james'], cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80' },
     { name: 'Sam C.S.', aliases: ['sam c.s.', 'sam cs'], cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80' },
-    { name: 'Santhosh Narayanan', aliases: ['santhosh narayanan'], cover: 'https://upload.wikimedia.org/wikipedia/commons/a/a2/Santhosh_Narayanan_-_WIki_profile.jpg' },
-    { name: 'Sean Roldan', aliases: ['sean roldan'], cover: 'https://upload.wikimedia.org/wikipedia/commons/6/63/Sean_Roldan.jpg' },
+    { name: 'Santhosh Narayanan', aliases: ['santhosh narayanan'], cover: DEFAULT_SONG_COVER },
+    { name: 'Sean Roldan', aliases: ['sean roldan'], cover: DEFAULT_SONG_COVER },
     { name: 'Siddhu Kumar', aliases: ['siddhu kumar'], cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80' },
     { name: 'Stephen Zechariah', aliases: ['stephen zechariah'], cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80' },
     { name: 'Vidyasagar', aliases: ['vidyasagar'], cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80' },
     { name: 'Vivek - Mervin', aliases: ['vivek - mervin', 'vivek-mervin'], cover: '/images/artists/vivek.jpg' },
-    { name: 'Yuvan Shankar Raja', aliases: ['yuvan shankar raja', 'yuvan'], cover: 'https://upload.wikimedia.org/wikipedia/commons/b/b6/Yuvan_Shankar_Raja_exclusive_HQ_Photos_Silverscreen.jpg' }
+    { name: 'Yuvan Shankar Raja', aliases: ['yuvan shankar raja', 'yuvan'], cover: DEFAULT_SONG_COVER }
   ];
 
+  function deduplicateSongList(songs) {
+    if (!Array.isArray(songs)) return [];
+    const seen = new Set();
+    const result = [];
+    for (const s of songs) {
+      if (!s || !s.title) continue;
+      const key = s.cloudinary_public_id || s.id || ((s.title || '').trim().toLowerCase() + '___' + (s.artist || '').trim().toLowerCase());
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(s);
+      }
+    }
+    return result;
+  }
+
   function getAlphabeticalSongs() {
-    return [...allSongs].sort((a, b) => {
+    return deduplicateSongList([...allSongs]).sort((a, b) => {
       const titleA = (a.title || '').trim();
       const titleB = (b.title || '').trim();
       return titleA.localeCompare(titleB, undefined, { sensitivity: 'base', numeric: true });
@@ -179,10 +243,66 @@
       let artArr = [];
       if (Array.isArray(s.artists)) artArr = s.artists.map(a => a.toLowerCase());
       else {
-        try { artArr = JSON.parse(s.artists_json || '[]').map(a => a.toLowerCase()); } catch(e) {}
+        try { artArr = JSON.parse(s.artists_json || '[]').map(a => a.toLowerCase()); } catch (e) { }
       }
       return aliases.some(alias => artStr.includes(alias) || albumArt.includes(alias) || artArr.some(a => a.includes(alias)));
     });
+  }
+
+  // Returns the set of songs belonging to a given PLAYLIST_DEFINITION entry.
+  // type 'all'    → entire library sorted alphabetically by title (All Songs + Sharu + Hills)
+  // type 'folder' → songs whose folder matches (e.g. 'sharu' or 'hills')
+  // type 'artist' → songs whose artist/album_artist/artists_json matches any alias
+  // type 'other'  → songs NOT matched by ANY of the fixed artist playlists
+  function getPlaylistSongs(pl) {
+    const fixedArtistPlaylists = PLAYLIST_DEFINITIONS.filter(p => p.type === 'artist');
+
+    function songMatchesAliases(song, aliases) {
+      const artStr = (song.artist || '').toLowerCase();
+      const albumArt = (song.album_artist || '').toLowerCase();
+      const folderStr = (song.folder || '').toLowerCase();
+      let artArr = [];
+      if (Array.isArray(song.artists)) artArr = song.artists.map(a => a.toLowerCase());
+      else {
+        try { artArr = JSON.parse(song.artists_json || '[]').map(a => a.toLowerCase()); } catch (e) { }
+      }
+      return aliases.some(alias =>
+        artStr.includes(alias) ||
+        albumArt.includes(alias) ||
+        folderStr.includes(alias) ||
+        artArr.some(a => a.includes(alias))
+      );
+    }
+
+    const sortAlpha = arr => deduplicateSongList(arr).sort((a, b) =>
+      (a.title || '').trim().localeCompare((b.title || '').trim(), undefined, { sensitivity: 'base', numeric: true })
+    );
+
+    if (pl.type === 'all') {
+      return sortAlpha(allSongs);
+    }
+
+    if (pl.type === 'folder') {
+      const target = (pl.folder || '').toLowerCase();
+      return sortAlpha(allSongs.filter(s => (s.folder || '').toLowerCase().includes(target)));
+    }
+
+    if (pl.type === 'artist') {
+      return sortAlpha(allSongs.filter(s => songMatchesAliases(s, pl.aliases)));
+    }
+
+    if (pl.type === 'other') {
+      // Songs not matched by any fixed artist playlist
+      const matched = new Set();
+      for (const fixedPl of fixedArtistPlaylists) {
+        allSongs.forEach(s => {
+          if (songMatchesAliases(s, fixedPl.aliases)) matched.add(s.id);
+        });
+      }
+      return sortAlpha(allSongs.filter(s => !matched.has(s.id)));
+    }
+
+    return [];
   }
   const mobileMiniNextBtn = document.getElementById('mobileMiniNextBtn');
   const mobileBarPlaySvg = document.getElementById('mobileBarPlaySvg');
@@ -330,61 +450,23 @@
   const fsDeviceName = document.getElementById('fsDeviceName');
   const fsBtnShare = document.getElementById('fsBtnShare');
   const fsBtnQueue = document.getElementById('fsBtnQueue');
-  const fsFloatingLyrics = document.getElementById('fsFloatingLyrics');
-  const fsFloatingLyric = document.getElementById('fsFloatingLyric');
-  const fsLyricsPeekCard = document.getElementById('fsLyricsPeekCard');
-  const fsLyricsPeekText = document.getElementById('fsLyricsPeekText');
+  const fsFloatingLyric = null;    // removed — lyrics section removed from Now Playing
+  const fsLyricsPeekCard = null;    // removed — lyrics section removed from Now Playing
+  const fsLyricsPeekText = null;    // removed — lyrics section removed from Now Playing
 
-  // Song Live Lyrics Mapping (Authentic Spotify Canvas Feel matching Image 2)
-  const songLyricsMap = {
-    'othaiyadi': {
-      floating: 'en uchurul enduheen-enduheen',
-      preview: 'en niloti, niloti...<br><span class="highlight">en uchurul enduheen-enduheen</span>'
-    },
-    'sirai': {
-      floating: 'en uchurul enduheen-enduheen',
-      preview: 'en niloti, niloti...<br><span class="highlight">en uchurul enduheen-enduheen</span>'
-    },
-    'neelothi': {
-      floating: 'en uchurul enduheen-enduheen',
-      preview: 'en niloti, niloti...<br><span class="highlight">en uchurul enduheen-enduheen</span>'
-    },
-    'enna solla': {
-      floating: 'Ilamai muzhuvadhum azhagaana kanavu...',
-      preview: 'Enna solla pogirai sandhana thendrale...<br><span class="highlight">Ilamai muzhuvadhum azhagaana kanavu...</span>'
-    },
-    'jailer': {
-      floating: 'Alappara kelapparom, thalaivara paathaa bayamaa...',
-      preview: 'Hukum Tiger ka hukum...<br><span class="highlight">Alappara kelapparom, thalaivara paathaa bayamaa...</span>'
-    },
-    'leo': {
-      floating: 'Naa ready dhan varavaa anna erangi paakkavaa...',
-      preview: 'Thala suthudha machi, whistle parakkudha...<br><span class="highlight">Naa ready dhan varavaa anna erangi paakkavaa...</span>'
-    },
-    'kanaa': {
-      floating: 'Vaayadi petha pulla vambula maattikitta...',
-      preview: 'Othaiyadi paadhayila thaavi oduren...<br><span class="highlight">en uchurul enduheen-enduheen</span>'
+  // Ensure all main player image elements seamlessly fallback to DEFAULT_SONG_COVER
+  [barThumb, rightCoverImg, playlistCoverImg, fsCoverImg, fsThumbImg, contextTrackCover].forEach(img => {
+    if (img) {
+      img.addEventListener('error', function () {
+        if (!this.src.endsWith(DEFAULT_SONG_COVER)) {
+          this.src = DEFAULT_SONG_COVER;
+        }
+      });
     }
-  };
+  });
 
-  function getLyricsForSong(song) {
-    if (!song) {
-      return {
-        floating: 'en uchurul enduheen-enduheen',
-        preview: 'en niloti, niloti...<br><span class="highlight">en uchurul enduheen-enduheen</span>'
-      };
-    }
-    const combined = `${song.title || ''} ${song.movie || ''} ${song.album || ''}`.toLowerCase();
-    for (const key of Object.keys(songLyricsMap)) {
-      if (combined.includes(key)) {
-        return songLyricsMap[key];
-      }
-    }
-    return {
-      floating: 'en uchurul enduheen-enduheen',
-      preview: 'en niloti, niloti...<br><span class="highlight">en uchurul enduheen-enduheen</span>'
-    };
-  }
+  // getLyricsForSong removed — lyrics section has been removed from Now Playing page.
+
 
   // W3C MediaSession API for Continuous Background Playback (Android / iOS lockscreen & earbuds)
   function updateMediaSession(song) {
@@ -392,9 +474,9 @@
     const coverUrl = song.cover_image_url || '/images/covers/enna_solla.jpg';
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: song.title || 'Spotkify Track',
-        artist: song.artist || 'Spotkify Artist',
-        album: song.movie ? `From "${song.movie}"` : (song.album || 'Spotkify'),
+        title: song.title || 'Dheemafy Track',
+        artist: song.artist || 'Dheemafy Artist',
+        album: song.movie ? `From "${song.movie}"` : (song.album || 'Dheemafy'),
         artwork: [
           { src: coverUrl, sizes: '96x96', type: 'image/jpeg' },
           { src: coverUrl, sizes: '128x128', type: 'image/jpeg' },
@@ -420,7 +502,7 @@
           position: Math.min(Math.max(0, audio.currentTime), audio.duration)
         });
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   function initMediaSessionHandlers() {
@@ -468,7 +550,7 @@
     for (const [action, handler] of handlers) {
       try {
         navigator.mediaSession.setActionHandler(action, handler);
-      } catch (err) {}
+      } catch (err) { }
     }
   }
 
@@ -548,7 +630,7 @@
       try {
         const parsed = JSON.parse(song.artists);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {}
+      } catch (e) { }
     }
     if (song.artist) {
       return song.artist.split(',').map(a => a.trim()).filter(Boolean);
@@ -605,7 +687,8 @@
           throw new Error(`Catalog fetch failed with HTTP ${res.status}`);
         }
         const json = await res.json();
-        const songs = (json && json.data) || [];
+        const rawSongs = (json && json.data) || [];
+        const songs = deduplicateSongList(rawSongs);
         if (songs.length > 0 || !isCatalogLoaded) {
           catalog = songs;
           isCatalogLoaded = true;
@@ -713,6 +796,7 @@
         if (!isPlayerBootstrapped) {
           isPlayerBootstrapped = true;
           currentPlaylist = [...allSongs];
+          activePlaybackPlaylist = [...allSongs]; // Initial playback context = full library
 
           if (allSongs.length > 0) {
             // FIX-1: Pick a random song on every initial page open so the default is never the same.
@@ -727,7 +811,7 @@
 
             // Immediately pre-cache the initial song and next 5 upcoming songs
             audioPreloader.preloadTrack(initialSong, 'high');
-            audioPreloader.preloadUpcoming(currentTrackIndex, currentPlaylist, 5);
+            audioPreloader.preloadUpcoming(currentTrackIndex, activePlaybackPlaylist, 5);
           }
           try {
             updateVolumeUI(currentVolume);
@@ -736,13 +820,14 @@
           }
         } else {
           // Non-destructive update: Maintain currently active track & playlist without resetting playback!
-          const activeTrack = currentPlaylist[currentTrackIndex] || (audio && audio.src ? allSongs.find(s => s.audio_url === audio.src) : null);
+          const activeTrack = activePlaybackPlaylist[currentTrackIndex] || (audio && audio.src ? allSongs.find(s => s.audio_url === audio.src) : null);
           if (activeTrack) {
-            const newIdx = allSongs.findIndex(s => s.id === activeTrack.id);
+            const newIdx = activePlaybackPlaylist.findIndex(s => s.id === activeTrack.id);
             if (newIdx !== -1) {
               currentTrackIndex = newIdx;
             }
           }
+          // Update browsing context but leave activePlaybackPlaylist untouched
           currentPlaylist = [...allSongs];
         }
 
@@ -780,10 +865,10 @@
       : allSongs.slice(0, 6);
 
     // ========================================================================
-    // MOBILE HOME FLOW: EXACT REQUIRED 4-TIER HIERARCHY
+    // MOBILE HOME FLOW: 4-TIER HIERARCHY
     // 1. ALL SONGS (Alphabetical by title, Show all)
-    // 2. CLOUDINARY PLAYLISTS / FOLDERS (Exact 7 playlists)
-    // 3. MUSIC DIRECTOR-WISE PLAYLISTS (Deterministic alphabetical composers)
+    // 2. FIXED PLAYLISTS: All Songs, Sharu, Hills, Anirudh, A.R Rahman, Sid Sriram, Other Artists
+    // 3. MUSIC DIRECTOR-WISE PLAYLISTS (Dynamic from KNOWN_MUSIC_DIRECTORS)
     // 4. OTHER EXISTING HOME SECTIONS (Popular Artists, Trending)
     // ========================================================================
 
@@ -806,27 +891,17 @@
       };
     }
 
-    // 2. CLOUDINARY PLAYLISTS / FOLDERS (SECOND SECTION)
+    // 2. NEW FIXED PLAYLISTS (SECOND SECTION) – replaces old Cloudinary folder playlists
     if (mobilePlaylistsCarousel) {
-      const orderedPlaylists = CLOUDINARY_PLAYLISTS_ORDER.map(name => {
-        const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
-        const folderTracks = allSongs.filter(s => (s.folder || '').toLowerCase() === name.toLowerCase());
-        const plDetail = (homeData && homeData.featuredPlaylists)
-          ? homeData.featuredPlaylists.find(p => p.name.toLowerCase() === name.toLowerCase())
-          : null;
-        return {
-          id: plDetail?.id || `pl-${slug}`,
-          name: name,
-          song_count: folderTracks.length || plDetail?.song_count || 0,
-          cover: plDetail?.uploaded_image || `/images/playlists/${slug}.svg`,
-          tracks: folderTracks
-        };
+      const renderedPlaylists = PLAYLIST_DEFINITIONS.map(pl => {
+        const songs = getPlaylistSongs(pl);
+        return { ...pl, song_count: songs.length, tracks: songs };
       });
 
-      mobilePlaylistsCarousel.innerHTML = orderedPlaylists.map(pl => `
-        <div class="spotify-card playlist-card" data-playlist-id="${pl.id}" data-folder="${pl.name}">
+      mobilePlaylistsCarousel.innerHTML = renderedPlaylists.map(pl => `
+        <div class="spotify-card playlist-card" data-playlist-id="${pl.id}" data-playlist-name="${pl.name}">
           <div class="card-img-wrap">
-            <img class="card-img" src="${pl.cover}" alt="${pl.name}" onerror="this.onerror=null; this.src='/images/playlists/long_drive_tamil.svg'">
+            <img class="card-img" src="${pl.cover || DEFAULT_SONG_COVER}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
             <button class="card-play-btn" title="Play ${pl.name}">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             </button>
@@ -837,17 +912,27 @@
       `).join('');
 
       mobilePlaylistsCarousel.querySelectorAll('.playlist-card').forEach(card => {
-        card.addEventListener('click', async (e) => {
-          const folderName = card.getAttribute('data-folder');
-          const plId = card.getAttribute('data-playlist-id');
-          await openFolderPlaylist(folderName, plId);
+        card.addEventListener('click', () => {
+          const plName = card.getAttribute('data-playlist-name');
+          const plDef = PLAYLIST_DEFINITIONS.find(p => p.name === plName);
+          if (!plDef) return;
+          const tracks = getPlaylistSongs(plDef);
+          const desc = plDef.type === 'all'
+            ? `Complete library with ${tracks.length} songs `
+            : plDef.type === 'folder'
+              ? `Songs from folder "${plDef.name}" • ${tracks.length} songs`
+              : plDef.type === 'other'
+                ? `All songs not in the main artist playlists • ${tracks.length} songs`
+                : `Songs by ${plDef.name} • ${tracks.length} songs`;
+          openPlaylistView(plDef.name, desc, plDef.cover, tracks);
         });
       });
     }
 
     if (mobileBtnShowAllPlaylists) {
       mobileBtnShowAllPlaylists.onclick = () => {
-        openPlaylistView('Cloudinary Master Collection', `Original master audio recordings (${allSongs.length} tracks)`, allSongs[0]?.cover_image_url, allSongs);
+        const sorted = getAlphabeticalSongs();
+        openPlaylistView('All Songs', `Complete library with ${sorted.length} songs in alphabetical order`, sorted[0]?.cover_image_url || DEFAULT_SONG_COVER, sorted);
       };
     }
 
@@ -865,7 +950,7 @@
       mobileDirectorsCarousel.innerHTML = directorsWithSongs.map(dir => `
         <div class="spotify-card director-card" data-director="${dir.name}">
           <div class="card-img-wrap">
-            <img class="card-img" src="${dir.cover || (dir.songs[0] && dir.songs[0].cover_image_url) || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300'}" alt="${dir.name}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300'">
+            <img class="card-img" src="${dir.cover || (dir.songs[0] && dir.songs[0].cover_image_url) || DEFAULT_SONG_COVER}" alt="${dir.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
             <button class="card-play-btn" title="Play ${dir.name}">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             </button>
@@ -913,7 +998,7 @@
       const allArtists = (homeData && homeData.popularArtists && homeData.popularArtists.length > 0)
         ? homeData.popularArtists
         : [];
-      
+
       const priorityOrder = ['Anirudh Ravichander', 'A.R. Rahman', 'Yuvan Shankar Raja', 'Harris Jayaraj', 'Sid Sriram', 'Santhosh Narayanan', 'G. V. Prakash', 'Pradeep Kumar', 'Sai Abhyankkar', 'Vivek', 'Dhanush', 'Shreya Ghoshal', 'Ilaiyaraaja'];
       const favList = [];
       for (const p of priorityOrder) {
@@ -928,7 +1013,7 @@
 
       mobileArtistsShelf.innerHTML = favList.slice(0, 12).map(art => `
         <div class="favourite-artist-card" data-slug="${art.slug || art.name}" data-artist="${art.name}">
-          <img class="favourite-artist-img" src="${art.large_image_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300'}" alt="${art.name}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300'">
+          <img class="favourite-artist-img" src="${art.large_image_url || DEFAULT_SONG_COVER}" alt="${art.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <span class="favourite-artist-name">${art.name}</span>
         </div>
       `).join('');
@@ -952,7 +1037,7 @@
 
     if (mobileBtnShowAllTrending) {
       mobileBtnShowAllTrending.onclick = () => {
-        openPlaylistView('Trending Master Hits', `Trending master recordings (${allSongs.length} songs available)`, allSongs[0]?.cover_image_url, allSongs);
+        openPlaylistView('Trending Master Hits', `Trending master recordings (${allSongs.length} songs available)`, allSongs[0]?.cover_image_url || DEFAULT_SONG_COVER, allSongs);
       };
     }
 
@@ -967,9 +1052,9 @@
     ];
 
     const curatedQuickPicks = staticQuickPicksConfig.map(cfg => {
-      const match = allSongs.find(s => 
-        (s.title || '').toLowerCase().includes(cfg.key) || 
-        (s.movie || '').toLowerCase().includes(cfg.key) || 
+      const match = allSongs.find(s =>
+        (s.title || '').toLowerCase().includes(cfg.key) ||
+        (s.movie || '').toLowerCase().includes(cfg.key) ||
         (s.album || '').toLowerCase().includes(cfg.key) ||
         (s.artist || '').toLowerCase().includes(cfg.key)
       );
@@ -994,7 +1079,7 @@
     if (quickPicksGrid) {
       quickPicksGrid.innerHTML = curatedQuickPicks.map(song => `
         <div class="quick-pick-card" data-song-id="${song.id}">
-          <img class="qp-cover" src="${song.displayCover || song.cover_image_url || '/images/covers/jailer.jpg'}" alt="${song.displayTitle || song.title}">
+          <img class="qp-cover" src="${song.displayCover || song.cover_image_url || DEFAULT_SONG_COVER}" alt="${song.displayTitle || song.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <span class="qp-title">${song.displayTitle || song.title}</span>
           <button class="qp-play-btn" title="Play ${song.displayTitle || song.title}">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -1051,7 +1136,7 @@
         return `
           <div class="spotify-card" data-song-id="${songId}">
             <div class="card-img-wrap">
-              <img class="card-img" src="${item.cover}" alt="${item.title}">
+              <img class="card-img" src="${item.cover || DEFAULT_SONG_COVER}" alt="${item.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
               <button class="card-play-btn" title="Play ${item.title}">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
               </button>
@@ -1075,34 +1160,40 @@
       });
     }
 
-    // 1.5 Featured Playlists Shelf (Cloudinary Folders)
+    // 1.5 Featured Playlists Shelf (New Fixed Playlists - replaces old DB folder playlists)
     if (featuredPlaylistsShelf) {
-      const folderPlaylists = (homeData && homeData.featuredPlaylists && homeData.featuredPlaylists.length > 0)
-        ? homeData.featuredPlaylists
-        : [];
-
-      if (folderPlaylists.length > 0) {
-        featuredPlaylistsShelf.innerHTML = folderPlaylists.map(pl => `
-          <div class="spotify-card playlist-card" data-playlist-id="${pl.id}" data-folder="${pl.name}">
+      featuredPlaylistsShelf.innerHTML = PLAYLIST_DEFINITIONS.map(pl => {
+        const songs = getPlaylistSongs(pl);
+        return `
+          <div class="spotify-card playlist-card" data-playlist-name="${pl.name}">
             <div class="card-img-wrap">
-              <img class="card-img" src="${pl.uploaded_image || '/images/playlists/long_drive_tamil.svg'}" alt="${pl.name}">
+              <img class="card-img" src="${pl.cover || DEFAULT_SONG_COVER}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
               <button class="card-play-btn" title="Play ${pl.name}">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
               </button>
             </div>
             <span class="card-title" title="${pl.name}">${pl.name}</span>
-            <span class="card-desc">Playlist • ${pl.song_count || 0} songs</span>
+            <span class="card-desc">Playlist • ${songs.length} songs</span>
           </div>
-        `).join('');
+        `;
+      }).join('');
 
-        featuredPlaylistsShelf.querySelectorAll('.playlist-card').forEach(card => {
-          card.addEventListener('click', async () => {
-            const folderName = card.getAttribute('data-folder');
-            const plId = card.getAttribute('data-playlist-id');
-            await openFolderPlaylist(folderName, plId);
-          });
+      featuredPlaylistsShelf.querySelectorAll('.playlist-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const plName = card.getAttribute('data-playlist-name');
+          const plDef = PLAYLIST_DEFINITIONS.find(p => p.name === plName);
+          if (!plDef) return;
+          const tracks = getPlaylistSongs(plDef);
+          const desc = plDef.type === 'all'
+            ? `Complete library with ${tracks.length} songs `
+            : plDef.type === 'folder'
+              ? `Songs from folder "${plDef.name}" • ${tracks.length} songs`
+              : plDef.type === 'other'
+                ? `All songs not in the main artist playlists • ${tracks.length} songs`
+                : `Songs by ${plDef.name} • ${tracks.length} songs`;
+          openPlaylistView(plDef.name, desc, plDef.cover, tracks);
         });
-      }
+      });
     }
 
     // 2. Trending Shelf
@@ -1121,7 +1212,7 @@
     artistsShelf.innerHTML = artists.map(art => `
       <div class="spotify-card artist-card" data-slug="${art.slug || art.name}" data-artist="${art.name}">
         <div class="card-img-wrap">
-          <img class="card-img" src="${art.large_image_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300'}" alt="${art.name}">
+          <img class="card-img" src="${art.large_image_url || DEFAULT_SONG_COVER}" alt="${art.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <button class="card-play-btn" title="Play ${art.name}">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           </button>
@@ -1142,16 +1233,16 @@
     const albums = (homeData && homeData.popularAlbums && homeData.popularAlbums.length > 0)
       ? homeData.popularAlbums
       : [
-          { name: 'VadaChennai', album_artist: 'Santhosh Narayanan', large_image_url: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300' },
-          { name: 'Blue Star', album_artist: 'Govind Vasantha', large_image_url: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300' },
-          { name: 'Retro Soundtrack', album_artist: 'Santhosh Narayanan', large_image_url: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=300' },
-          { name: 'Bachelor', album_artist: 'Dhibu Ninan Thomas', large_image_url: 'https://images.unsplash.com/photo-1520523839898-5071282543e1?w=300' }
-        ];
+        { name: 'VadaChennai', album_artist: 'Santhosh Narayanan', large_image_url: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300' },
+        { name: 'Blue Star', album_artist: 'Govind Vasantha', large_image_url: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300' },
+        { name: 'Retro Soundtrack', album_artist: 'Santhosh Narayanan', large_image_url: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=300' },
+        { name: 'Bachelor', album_artist: 'Dhibu Ninan Thomas', large_image_url: 'https://images.unsplash.com/photo-1520523839898-5071282543e1?w=300' }
+      ];
 
     albumsShelf.innerHTML = albums.map(alb => `
       <div class="spotify-card album-card" data-album="${alb.name}">
         <div class="card-img-wrap">
-          <img class="card-img" src="${alb.large_image_url || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=300'}" alt="${alb.name}">
+          <img class="card-img" src="${alb.large_image_url || DEFAULT_SONG_COVER}" alt="${alb.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <button class="card-play-btn" title="Play ${alb.name}">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           </button>
@@ -1177,7 +1268,7 @@
     return `
       <div class="spotify-card" data-song-id="${song.id}">
         <div class="card-img-wrap">
-          <img class="card-img" src="${song.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300'}" alt="${song.title}" loading="lazy">
+          <img class="card-img" src="${song.cover_image_url || DEFAULT_SONG_COVER}" alt="${song.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';" loading="lazy">
           <button class="card-play-btn" title="Play ${song.title}">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           </button>
@@ -1205,59 +1296,104 @@
     if (libLikedCount) libLikedCount.textContent = likedSongs.length;
     if (libAllTracksCount) libAllTracksCount.textContent = allSongs.length;
 
-    let artistsList = [];
-    if (homeData && homeData.popularArtists && homeData.popularArtists.length > 0) {
-      artistsList = homeData.popularArtists.slice(0, 10);
-    } else {
-      try {
-        const res = await fetch('/api/artists?limit=10');
-        const json = await res.json();
-        artistsList = (json && json.data) || [];
-      } catch (e) {}
-    }
+    if (!dynamicLibraryList) return;
 
-    dynamicLibraryList.innerHTML = artistsList.map(art => `
-      <div class="library-item" data-type="artist" data-slug="${art.slug || art.name}" data-name="${art.name}">
-        <img class="library-item-img circle" src="${art.large_image_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100'}" alt="${art.name}" onerror="this.src='https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100'">
-        <div class="library-item-meta">
-          <span class="library-item-title">${art.name}</span>
-          <span class="library-item-sub">Artist • ${art.song_count ? `${art.song_count} songs` : 'Artist'}</span>
+    // Build sidebar list: fixed playlists first, then dynamic music director playlists
+    const fixedPlaylistItems = PLAYLIST_DEFINITIONS.map(pl => {
+      const songs = getPlaylistSongs(pl);
+      const coverUrl = pl.cover || DEFAULT_SONG_COVER;
+      const sub = pl.type === 'all' ? `Playlist • ${songs.length} songs` :
+        pl.type === 'other' ? `Playlist • ${songs.length} songs` :
+          `Playlist • ${songs.length} songs`;
+      return `
+        <div class="library-item" data-type="playlist" data-playlist-id="${pl.id}" data-playlist-name="${pl.name}">
+          <img class="library-item-img" src="${coverUrl}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
+          <div class="library-item-meta">
+            <span class="library-item-title">${pl.name}</span>
+            <span class="library-item-sub">${sub}</span>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
-    dynamicLibraryList.querySelectorAll('.library-item').forEach(item => {
+    // Dynamic music director playlists (only those with songs, excluding already-fixed artists)
+    const fixedAliases = PLAYLIST_DEFINITIONS
+      .filter(p => p.type === 'artist')
+      .flatMap(p => p.aliases);
+
+    const directorItems = KNOWN_MUSIC_DIRECTORS.map(dir => {
+      // Skip if this director is already covered by a fixed playlist
+      const isFixed = fixedAliases.some(alias =>
+        dir.aliases.some(da => da.includes(alias) || alias.includes(da))
+      );
+      if (isFixed) return '';
+      const songs = getDirectorSongs(dir, allSongs);
+      if (songs.length === 0) return '';
+      const coverUrl = dir.cover || DEFAULT_SONG_COVER;
+      return `
+        <div class="library-item" data-type="director" data-director="${dir.name}">
+          <img class="library-item-img circle" src="${coverUrl}" alt="${dir.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
+          <div class="library-item-meta">
+            <span class="library-item-title">${dir.name}</span>
+            <span class="library-item-sub">Artist • ${songs.length} songs</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    dynamicLibraryList.innerHTML = fixedPlaylistItems + directorItems;
+
+    // Fixed playlist click handlers
+    dynamicLibraryList.querySelectorAll('.library-item[data-type="playlist"]').forEach(item => {
       item.addEventListener('click', () => {
-        const slug = item.getAttribute('data-slug') || item.getAttribute('data-name');
-        openArtistView(slug);
+        dynamicLibraryList.querySelectorAll('.library-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        const plName = item.getAttribute('data-playlist-name');
+        const plDef = PLAYLIST_DEFINITIONS.find(p => p.name === plName);
+        if (!plDef) return;
+        const tracks = getPlaylistSongs(plDef);
+        const desc = plDef.type === 'all'
+          ? `Complete library with ${tracks.length} songs`
+          : plDef.type === 'folder'
+            ? `Songs from folder "${plDef.name}" • ${tracks.length} songs`
+            : plDef.type === 'other'
+              ? `All songs not in the main artist playlists • ${tracks.length} songs`
+              : `Songs by ${plDef.name} • ${tracks.length} songs`;
+        openPlaylistView(plDef.name, desc, plDef.cover, tracks);
       });
     });
 
-    // Dynamically update folder playlist badges/counts if available
-    if (homeData && homeData.featuredPlaylists) {
-      homeData.featuredPlaylists.forEach(pl => {
-        const item = document.querySelector(`.library-items-list .library-item[data-folder="${pl.name}"]`);
-        if (item) {
-          const sub = item.querySelector('.library-item-sub');
-          if (sub) sub.textContent = `Playlist • ${pl.song_count} songs`;
+    // Music director playlist click handlers
+    dynamicLibraryList.querySelectorAll('.library-item[data-type="director"]').forEach(item => {
+      item.addEventListener('click', () => {
+        dynamicLibraryList.querySelectorAll('.library-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        const dirName = item.getAttribute('data-director');
+        const dirObj = KNOWN_MUSIC_DIRECTORS.find(d => d.name === dirName);
+        if (!dirObj) return;
+        const songs = getDirectorSongs(dirObj, allSongs);
+        if (songs.length > 0) {
+          openPlaylistView(
+            dirObj.name,
+            `Songs by ${dirObj.name} • ${songs.length} songs`,
+            dirObj.cover || songs[0]?.cover_image_url,
+            songs
+          );
         }
       });
-    }
+    });
 
-    // Wire up playlists in Left Sidebar
+    // Static sidebar items (Liked Songs, All Tracks) - wire up if they exist
     document.querySelectorAll('.library-items-list .library-item[data-target]').forEach(item => {
       item.onclick = async () => {
         document.querySelectorAll('.library-items-list .library-item').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
         const target = item.getAttribute('data-target');
-        const folderName = item.getAttribute('data-folder');
-
-        if (folderName) {
-          await openFolderPlaylist(folderName, target);
-        } else if (target === 'liked') {
-          openPlaylistView('Liked Songs', 'Songs you have liked on Spotkify', '/images/playlists/liked_songs.svg', allSongs.filter(s => s.is_liked));
+        if (target === 'liked') {
+          openPlaylistView('Liked Songs', 'Songs you have liked on Dheemafy', '/images/playlists/liked_songs.svg', allSongs.filter(s => s.is_liked));
         } else if (target === 'all') {
-          openPlaylistView('Master Collection', 'All tracks in your library', '/images/playlists/master_collection.svg', allSongs);
+          const sorted = getAlphabeticalSongs();
+          openPlaylistView('All Songs', `Complete library with ${sorted.length} songs in alphabetical order`, '/images/playlists/all_songs.svg', sorted);
         }
       };
     });
@@ -1265,10 +1401,21 @@
 
   async function openFolderPlaylist(folderName, plId) {
     if (!folderName) return;
-    let tracks = allSongs.filter(s => (s.folder || '').toLowerCase() === folderName.toLowerCase());
-    let desc = `Curated playlist from folder "${folderName}"`;
-    const slug = folderName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_');
-    let cover = `/images/playlists/${slug}.svg`;
+    const norm = folderName.toLowerCase().trim();
+    let tracks = [];
+    let desc = '';
+    let cover = '';
+
+    if (norm === 'all songs' || norm === 'all') {
+      tracks = getAlphabeticalSongs();
+      desc = `Complete library with ${tracks.length} songs in alphabetical order`;
+      cover = '/images/playlists/all_songs.svg';
+    } else {
+      tracks = allSongs.filter(s => (s.folder || '').toLowerCase().includes(norm));
+      desc = `Songs from folder "${folderName}" • ${tracks.length} songs`;
+      const slug = norm.replace(/[^a-z0-9]+/g, '_');
+      cover = `/images/playlists/${slug}.svg`;
+    }
 
     if (tracks.length === 0 && plId) {
       try {
@@ -1291,23 +1438,28 @@
   // PLAYLIST / TRACK TABLE VIEW
   // ==========================================================================
   function openPlaylistView(title, desc, coverUrl, trackList) {
-    currentPlaylist = trackList;
+    const uniqueTrackList = deduplicateSongList(trackList);
+    // FIX-2: Only update the BROWSING context here.
+    // The active playback queue (activePlaybackPlaylist) is ONLY replaced when the user
+    // explicitly presses Play / Play All on this playlist — NOT by merely opening it.
+    currentPlaylist = uniqueTrackList;
     currentRoute = 'playlist';
 
     playlistTitle.textContent = title;
     playlistDesc.textContent = desc;
-    playlistCoverImg.src = coverUrl || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600';
-    playlistTrackCount.textContent = `${trackList.length} songs`;
+    playlistCoverImg.src = coverUrl || DEFAULT_SONG_COVER;
+    playlistTrackCount.textContent = `${uniqueTrackList.length} songs`;
 
-    const totalSeconds = trackList.reduce((acc, s) => acc + (s.duration || 0), 0);
+    const totalSeconds = uniqueTrackList.reduce((acc, s) => acc + (s.duration || 0), 0);
     const hours = Math.floor(totalSeconds / 3600);
     const mins = Math.floor((totalSeconds % 3600) / 60);
     playlistTotalDuration.textContent = hours > 0 ? `${hours} hr ${mins} min` : `${mins} min`;
 
     setAmbientColor(title);
-    renderTrackTableRows(trackList);
+    renderTrackTableRows(uniqueTrackList);
 
     // Switch view
+    exitSearchView();
     viewHome.classList.remove('active');
     viewSearch.classList.remove('active');
     viewArtist.classList.remove('active');
@@ -1320,7 +1472,7 @@
     playlistTrackRows.innerHTML = tracks.map((song, idx) => {
       const isCurrent = currentTrackIndex >= 0 && currentPlaylist[currentTrackIndex] && currentPlaylist[currentTrackIndex].id === song.id;
       const rowClass = `table-row ${isCurrent ? 'playing' : ''}`;
-      const cover = song.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=80';
+      const cover = song.cover_image_url || DEFAULT_SONG_COVER;
       const albumOrMovie = song.movie ? `From "${song.movie}"` : (song.album || 'Single');
 
       return `
@@ -1336,7 +1488,7 @@
             </span>
           </div>
           <div class="row-title-col">
-            <img class="row-thumb" src="${cover}" alt="${song.title}" loading="lazy">
+            <img class="row-thumb" src="${cover}" alt="${song.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';" loading="lazy">
             <div class="row-text">
               <span class="row-song-title" title="${song.title}">${song.title}</span>
               <span class="row-artist-name">${renderArtistLinksHtml(song)}</span>
@@ -1360,7 +1512,18 @@
       row.addEventListener('click', (e) => {
         if (e.target.closest('.row-heart-btn') || e.target.closest('.artist-link-item')) return;
         const index = parseInt(row.getAttribute('data-index'), 10);
-        if (currentTrackIndex === index) {
+        // FIX-2: Clicking a row commits the browsing playlist to the active playback queue
+        const isAlreadyActivePlaylist = (activePlaybackPlaylist === currentPlaylist ||
+          (activePlaybackPlaylist.length === currentPlaylist.length &&
+            activePlaybackPlaylist[0] && currentPlaylist[0] &&
+            activePlaybackPlaylist[0].id === currentPlaylist[0].id));
+        if (!isAlreadyActivePlaylist) {
+          // Commit browsing playlist to active playback
+          activePlaybackPlaylist = [...currentPlaylist];
+          shufflePlaylistVersion++; // invalidate shuffle queue
+        }
+        if (currentTrackIndex === index && activePlaybackPlaylist[index] &&
+          currentSong && currentSong.id === activePlaybackPlaylist[index].id) {
           togglePlayPause();
         } else {
           playTrackAtIndex(index);
@@ -1401,6 +1564,7 @@
     currentRoute = 'artist';
 
     // Switch view to Artist
+    exitSearchView();
     viewHome.classList.remove('active');
     viewPlaylist.classList.remove('active');
     viewSearch.classList.remove('active');
@@ -1431,7 +1595,7 @@
 
       artistViewName.textContent = artist.name;
       const count = songs.length;
-      artistViewStats.textContent = `${count} ${count === 1 ? 'song' : 'songs'} credited in Spotkify library`;
+      artistViewStats.textContent = `${count} ${count === 1 ? 'song' : 'songs'} credited in Dheemafy library`;
 
       const heroImg = artist.large_image_url || (songs[0] && songs[0].cover_image_url) || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200';
       artistHeroBackdrop.style.backgroundImage = `url("${heroImg}")`;
@@ -1448,7 +1612,7 @@
     artistTrackRows.innerHTML = tracks.map((song, idx) => {
       const isCurrent = currentTrackIndex >= 0 && currentPlaylist[currentTrackIndex] && currentPlaylist[currentTrackIndex].id === song.id;
       const rowClass = `table-row ${isCurrent ? 'playing' : ''}`;
-      const cover = song.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=80';
+      const cover = song.cover_image_url || DEFAULT_SONG_COVER;
       const albumOrMovie = song.movie ? `From "${song.movie}"` : (song.album || 'Single');
 
       return `
@@ -1464,7 +1628,7 @@
             </span>
           </div>
           <div class="row-title-col">
-            <img class="row-thumb" src="${cover}" alt="${song.title}" loading="lazy">
+            <img class="row-thumb" src="${cover}" alt="${song.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';" loading="lazy">
             <div class="row-text">
               <span class="row-song-title" title="${song.title}">${song.title}</span>
               <span class="row-artist-name">${renderArtistLinksHtml(song)}</span>
@@ -1517,6 +1681,13 @@
 
   // ==========================================================================
   // SEARCH LOGIC
+  function exitSearchView() {
+    const topbar = document.getElementById('spotifyGlobalTopbar');
+    if (topbar) topbar.classList.remove('search-route-active');
+    if (mainSearchWrap) mainSearchWrap.classList.remove('search-route-active');
+    if (mobileHeaderChips) mobileHeaderChips.style.display = '';
+  }
+
   // ==========================================================================
   function openSearchView() {
     currentRoute = 'search';
@@ -1525,6 +1696,8 @@
     viewArtist.classList.remove('active');
     viewSearch.classList.add('active');
 
+    const topbar = document.getElementById('spotifyGlobalTopbar');
+    if (topbar) topbar.classList.add('search-route-active');
     if (mainSearchWrap) mainSearchWrap.classList.add('search-route-active');
     if (mobileHeaderChips) mobileHeaderChips.style.display = 'none';
 
@@ -1569,7 +1742,7 @@
 
         if (isArtistTop && matchedArtist) {
           topResultCard.innerHTML = `
-            <img class="top-result-img" style="border-radius: 50%;" src="${matchedArtist.large_image_url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200'}" alt="${matchedArtist.name}">
+            <img class="top-result-img" style="border-radius: 50%;" src="${matchedArtist.large_image_url || DEFAULT_SONG_COVER}" alt="${matchedArtist.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
             <h2 class="top-result-title">${matchedArtist.name}</h2>
             <p class="top-result-sub">Artist • ${matchedArtist.song_count || songs.length} songs</p>
             <span class="top-result-badge">Artist</span>
@@ -1581,7 +1754,7 @@
         } else if (songs.length > 0) {
           const top = songs[0];
           topResultCard.innerHTML = `
-            <img class="top-result-img" src="${top.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200'}" alt="${top.title}">
+            <img class="top-result-img" src="${top.cover_image_url || DEFAULT_SONG_COVER}" alt="${top.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
             <h2 class="top-result-title">${top.title}</h2>
             <p class="top-result-sub">${top.artist} • <span style="color:#fff;">${top.movie ? `From "${top.movie}"` : (top.album || 'Single')}</span></p>
             <span class="top-result-badge">Song</span>
@@ -1594,9 +1767,9 @@
 
         // Mini rows (top 4)
         searchMiniRows.innerHTML = songs.slice(0, 4).map((s, idx) => `
-          <div class="table-row" data-song-id="${s.id}" data-index="${idx}">
+          <div class="table-row ${currentSong && currentSong.id === s.id ? 'playing' : ''}" data-song-id="${s.id}" data-index="${idx}">
             <div class="row-title-col">
-              <img class="row-thumb" src="${s.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=80'}" alt="${s.title}">
+              <img class="row-thumb" src="${s.cover_image_url || DEFAULT_SONG_COVER}" alt="${s.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
               <div class="row-text">
                 <span class="row-song-title">${s.title}</span>
                 <span class="row-artist-name">${renderArtistLinksHtml(s)}</span>
@@ -1617,12 +1790,12 @@
         });
         attachArtistLinkListeners(searchMiniRows);
 
-        // Full table
+        // Full table: Render all matching songs in order
         searchTableRows.innerHTML = songs.map((song, idx) => `
-          <div class="table-row" data-song-id="${song.id}">
+          <div class="table-row ${currentSong && currentSong.id === song.id ? 'playing' : ''}" data-song-id="${song.id}" data-index="${idx}">
             <div class="row-num"><span class="row-index-num">${idx + 1}</span></div>
             <div class="row-title-col">
-              <img class="row-thumb" src="${song.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=80'}" alt="${song.title}">
+              <img class="row-thumb" src="${song.cover_image_url || DEFAULT_SONG_COVER}" alt="${song.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
               <div class="row-text">
                 <span class="row-song-title">${song.title}</span>
                 <span class="row-artist-name">${renderArtistLinksHtml(song)}</span>
@@ -1630,17 +1803,33 @@
             </div>
             <div class="row-album-col">${song.movie ? `From "${song.movie}"` : (song.album || 'Single')}</div>
             <div class="row-date-col">${song.language || 'Master'}</div>
-            <div class="row-time-col"><span class="row-dur-span" data-song-id="${song.id}">${formatDuration(song.duration)}</span></div>
+            <div class="row-time-col">
+              <button class="row-heart-btn ${song.is_liked ? 'liked' : ''}" data-id="${song.id}" title="${song.is_liked ? 'Unlike' : 'Like'}">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="${song.is_liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+              </button>
+              <span class="row-dur-span" data-song-id="${song.id}">${formatDuration(song.duration)}</span>
+            </div>
           </div>
         `).join('');
 
         searchTableRows.querySelectorAll('.table-row').forEach(r => {
           r.addEventListener('click', (e) => {
-            if (e.target.closest('.artist-link-item')) return;
+            if (e.target.closest('.artist-link-item') || e.target.closest('.row-heart-btn')) return;
             const id = r.getAttribute('data-song-id');
             playTrackById(id, songs);
           });
         });
+
+        searchTableRows.querySelectorAll('.row-heart-btn').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            await toggleLikeSong(id);
+          });
+        });
+
         attachArtistLinkListeners(searchTableRows);
       } catch (err) {
         console.error('Search error:', err);
@@ -1681,7 +1870,7 @@
       barArtist.innerHTML = renderArtistLinksHtml(song);
       attachArtistLinkListeners(barArtist);
     }
-    if (barThumb) barThumb.src = song.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100';
+    if (barThumb) barThumb.src = song.cover_image_url || DEFAULT_SONG_COVER;
     if (barHeartBtn) barHeartBtn.classList.toggle('liked', Boolean(song.is_liked));
     if (barTotalTime) barTotalTime.textContent = formatDuration(song.duration);
 
@@ -1691,7 +1880,7 @@
       rightArtistName.innerHTML = renderArtistLinksHtml(song);
       attachArtistLinkListeners(rightArtistName);
     }
-    if (rightCoverImg) rightCoverImg.src = song.cover_image_url || '/images/covers/enna_solla.jpg';
+    if (rightCoverImg) rightCoverImg.src = song.cover_image_url || DEFAULT_SONG_COVER;
     if (rightArtistCardName) {
       const firstArtist = song.artist ? song.artist.split(',')[0].trim() : 'Artist';
       rightArtistCardName.textContent = firstArtist;
@@ -1715,12 +1904,12 @@
     // 3. Update Fullscreen UI
     if (fsTrackTitle) fsTrackTitle.textContent = song.title || '';
     if (fsArtistName) fsArtistName.textContent = song.artist || '';
-    if (fsHeaderContextSub) fsHeaderContextSub.textContent = 'Playing from Spotkify';
+    if (fsHeaderContextSub) fsHeaderContextSub.textContent = 'Playing from Dheemafy';
     if (fsHeaderPlaylistName) {
-      const searchKey = song.movie || song.title || 'Spotkify';
+      const searchKey = song.movie || song.title || 'Dheemafy';
       fsHeaderPlaylistName.textContent = `"${searchKey.toLowerCase()}"`;
     }
-    const coverArt = song.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600';
+    const coverArt = song.cover_image_url || DEFAULT_SONG_COVER;
     if (fsCoverImg) fsCoverImg.src = coverArt;
     if (fsThumbImg) fsThumbImg.src = coverArt;
     if (fsBackdrop) fsBackdrop.style.backgroundImage = `url('${coverArt}')`;
@@ -1729,11 +1918,6 @@
       fsAddSvgPlus.classList.toggle('hidden', Boolean(song.is_liked));
       fsAddSvgCheck.classList.toggle('hidden', !Boolean(song.is_liked));
     }
-
-    // 4. Dynamic Live Lyrics Synchronization
-    const lyricsData = getLyricsForSong(song);
-    if (fsFloatingLyric) fsFloatingLyric.textContent = lyricsData.floating;
-    if (fsLyricsPeekText) fsLyricsPeekText.innerHTML = lyricsData.preview;
 
     // 5. Update Mobile Mini Player UI
     const topLabel = mobilePlayerTopText || mobilePlayerTopLabel;
@@ -1745,13 +1929,13 @@
       mobileAddSvgCheck.classList.toggle('hidden', !Boolean(song.is_liked));
     }
 
-    // 6. Update Queue Next Row Preview
-    if (currentPlaylist && currentPlaylist.length > 0) {
-      const nextIdx = (currentTrackIndex + 1) % currentPlaylist.length;
-      const nextSong = currentPlaylist[nextIdx];
+    // 6. Update Queue Next Row Preview (FIX-2: read from activePlaybackPlaylist)
+    if (activePlaybackPlaylist && activePlaybackPlaylist.length > 0) {
+      const nextIdx = (currentTrackIndex + 1) % activePlaybackPlaylist.length;
+      const nextSong = activePlaybackPlaylist[nextIdx];
       if (nextSong && nextQueueRow) {
         nextQueueRow.innerHTML = `
-          <img class="row-thumb" src="${nextSong.cover_image_url || '/images/covers/kanaa.jpg'}" alt="${nextSong.title}">
+          <img class="row-thumb" src="${nextSong.cover_image_url || DEFAULT_SONG_COVER}" alt="${nextSong.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <div class="row-text">
             <span class="row-song-title">${nextSong.title}</span>
             <span class="row-artist-name">${renderArtistLinksHtml(nextSong)}</span>
@@ -1789,28 +1973,33 @@
   }
 
   function playTrackById(songId, playlistContext) {
+    // FIX-2: playTrackById always commits the given context to the ACTIVE PLAYBACK queue.
+    // This is the correct place to do so — a direct play action by the user.
     if (playlistContext && playlistContext.length > 0) {
-      currentPlaylist = playlistContext;
+      activePlaybackPlaylist = deduplicateSongList(playlistContext);
+      shufflePlaylistVersion++; // invalidate shuffle queue for new playlist
     }
-    const idx = currentPlaylist.findIndex(s => s.id === songId);
+    const idx = activePlaybackPlaylist.findIndex(s => s.id === songId);
     if (idx !== -1) {
       playTrackAtIndex(idx);
     } else {
       const fallback = allSongs.find(s => s.id === songId);
       if (fallback) {
-        currentPlaylist = [fallback, ...allSongs.filter(s => s.id !== songId)];
+        activePlaybackPlaylist = deduplicateSongList([fallback, ...allSongs.filter(s => s.id !== songId)]);
+        shufflePlaylistVersion++;
         playTrackAtIndex(0);
       }
     }
   }
 
   // Central Authoritative Play Function
+  // Always reads from activePlaybackPlaylist — the engine's queue.
   function playTrackAtIndex(index) {
-    if (index < 0 || index >= currentPlaylist.length) return;
+    if (index < 0 || index >= activePlaybackPlaylist.length) return;
 
     _isTransitioning = true;
     currentTrackIndex = index;
-    const song = currentPlaylist[index];
+    const song = activePlaybackPlaylist[index];
     if (!song) {
       _isTransitioning = false;
       return;
@@ -1824,7 +2013,7 @@
       return;
     }
 
-    console.log(`[Player] Playing: "${song.title}" (${index + 1}/${currentPlaylist.length})`);
+    console.log(`[Player] Playing: "${song.title}" (${index + 1}/${activePlaybackPlaylist.length})`);
 
     // 1. Assign direct Cloudinary stream URL synchronously
     audio.dataset.currentSongId = song.id;
@@ -1879,7 +2068,7 @@
 
     // 5. Pre-warm next tracks asynchronously
     if (audioPreloader && audioPreloader.preloadUpcoming) {
-      audioPreloader.preloadUpcoming(currentTrackIndex, currentPlaylist, 5);
+      audioPreloader.preloadUpcoming(currentTrackIndex, activePlaybackPlaylist, 5);
     }
 
     // 6. Record analytics asynchronously (non-blocking)
@@ -1888,8 +2077,8 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ songId: song.id, durationPlayed: 32, completed: false })
-      }).catch(() => {});
-    } catch (_) {}
+      }).catch(() => { });
+    } catch (_) { }
   }
 
   function setPlayingState(playing) {
@@ -1947,10 +2136,12 @@
 
   function resumePlayback() {
     if (!currentSong) {
-      if (currentPlaylist.length > 0) {
+      // FIX-2: Fall back to activePlaybackPlaylist, then allSongs
+      if (activePlaybackPlaylist.length > 0) {
         playTrackAtIndex(0);
       } else if (allSongs.length > 0) {
-        currentPlaylist = [...allSongs];
+        activePlaybackPlaylist = [...allSongs];
+        shufflePlaylistVersion++;
         playTrackAtIndex(0);
       }
       return;
@@ -1978,11 +2169,13 @@
   }
 
   function togglePlayPause() {
-    if (currentPlaylist.length === 0 && allSongs.length > 0) {
-      currentPlaylist = [...allSongs];
+    // FIX-2: use activePlaybackPlaylist for safety checks
+    if (activePlaybackPlaylist.length === 0 && allSongs.length > 0) {
+      activePlaybackPlaylist = [...allSongs];
+      shufflePlaylistVersion++;
     }
-    if (currentTrackIndex < 0 || !currentPlaylist[currentTrackIndex]) {
-      if (currentPlaylist.length > 0) {
+    if (currentTrackIndex < 0 || !activePlaybackPlaylist[currentTrackIndex]) {
+      if (activePlaybackPlaylist.length > 0) {
         playTrackAtIndex(0);
       }
       return;
@@ -2002,31 +2195,67 @@
   }
 
   function playNextTrack(isAutoAdvance = false) {
-    if (!currentPlaylist || currentPlaylist.length === 0) {
-      if (allSongs && allSongs.length > 0) currentPlaylist = [...allSongs];
-      else return;
+    // FIX-2: Use activePlaybackPlaylist (the engine queue), not currentPlaylist (browsing)
+    if (!activePlaybackPlaylist || activePlaybackPlaylist.length === 0) {
+      if (allSongs && allSongs.length > 0) {
+        activePlaybackPlaylist = [...allSongs];
+        shufflePlaylistVersion++;
+      } else return;
     }
 
     let nextIdx;
     if (isShuffle) {
-      let randIdx = Math.floor(Math.random() * currentPlaylist.length);
-      if (currentPlaylist.length > 1 && randIdx === currentTrackIndex) {
-        randIdx = (randIdx + 1) % currentPlaylist.length;
+      // FIX-3: Use version-based identity guard instead of fragile length comparison
+      if (shuffleQueueVersion !== shufflePlaylistVersion) {
+        shuffleQueue = generateShuffleOrder(activePlaybackPlaylist.length, currentTrackIndex >= 0 ? currentTrackIndex : 0);
+        shuffleQueueVersion = shufflePlaylistVersion;
+        shuffleIndex = 0;
       }
-      nextIdx = randIdx;
+      shuffleIndex++;
+      if (shuffleIndex >= shuffleQueue.length) {
+        // FIX-1: 3-state repeat
+        if (repeatMode === 'all') {
+          shuffleIndex = 0;
+        } else {
+          // 'off' or 'one' (one is handled by handleSongEnded, shouldn't reach here in shuffle)
+          if (audio) audio.pause();
+          setPlayingState(false);
+          return;
+        }
+      }
+      nextIdx = shuffleQueue[shuffleIndex];
     } else {
-      nextIdx = (currentTrackIndex + 1) % currentPlaylist.length;
+      const isAtEnd = currentTrackIndex + 1 >= activePlaybackPlaylist.length;
+      if (isAtEnd && isAutoAdvance) {
+        // FIX-1: 3-state repeat determines end-of-playlist behavior
+        if (repeatMode === 'all') {
+          nextIdx = 0; // wrap around
+        } else if (repeatMode === 'one') {
+          nextIdx = currentTrackIndex; // stay (also handled by handleSongEnded)
+        } else {
+          // 'off': stop
+          if (audio) audio.pause();
+          setPlayingState(false);
+          console.log('[Player] End of playlist reached. Repeat is OFF — stopping.');
+          return;
+        }
+      } else {
+        nextIdx = (currentTrackIndex + 1) % activePlaybackPlaylist.length;
+      }
     }
 
-    const nextSong = currentPlaylist[nextIdx];
-    console.log(`[Player] Next song: "${nextSong ? nextSong.title : 'Unknown'}" (Index ${nextIdx + 1}/${currentPlaylist.length}, autoAdvance=${isAutoAdvance})`);
+    const nextSong = activePlaybackPlaylist[nextIdx];
+    console.log(`[Player] Next song: "${nextSong ? nextSong.title : 'Unknown'}" (Index ${nextIdx + 1}/${activePlaybackPlaylist.length}, autoAdvance=${isAutoAdvance})`);
     playTrackAtIndex(nextIdx);
   }
 
   function playPrevTrack() {
-    if (!currentPlaylist || currentPlaylist.length === 0) {
-      if (allSongs && allSongs.length > 0) currentPlaylist = [...allSongs];
-      else return;
+    // FIX-2: Use activePlaybackPlaylist
+    if (!activePlaybackPlaylist || activePlaybackPlaylist.length === 0) {
+      if (allSongs && allSongs.length > 0) {
+        activePlaybackPlaylist = [...allSongs];
+        shufflePlaylistVersion++;
+      } else return;
     }
 
     // Standard streaming player rule:
@@ -2041,9 +2270,22 @@
       return;
     }
 
-    const prevIdx = (currentTrackIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
-    const prevSong = currentPlaylist[prevIdx];
-    console.log(`[Player] Previous song: "${prevSong ? prevSong.title : 'Unknown'}" (Index ${prevIdx + 1}/${currentPlaylist.length})`);
+    let prevIdx;
+    if (isShuffle) {
+      // FIX-3: Version-based guard
+      if (shuffleQueueVersion !== shufflePlaylistVersion) {
+        shuffleQueue = generateShuffleOrder(activePlaybackPlaylist.length, currentTrackIndex >= 0 ? currentTrackIndex : 0);
+        shuffleQueueVersion = shufflePlaylistVersion;
+        shuffleIndex = 0;
+      }
+      shuffleIndex = (shuffleIndex - 1 + shuffleQueue.length) % shuffleQueue.length;
+      prevIdx = shuffleQueue[shuffleIndex];
+    } else {
+      prevIdx = (currentTrackIndex - 1 + activePlaybackPlaylist.length) % activePlaybackPlaylist.length;
+    }
+
+    const prevSong = activePlaybackPlaylist[prevIdx];
+    console.log(`[Player] Previous song: "${prevSong ? prevSong.title : 'Unknown'}" (Index ${prevIdx + 1}/${activePlaybackPlaylist.length})`);
     playTrackAtIndex(prevIdx);
   }
 
@@ -2099,6 +2341,7 @@
 
   audio.addEventListener('timeupdate', () => {
     if (isSeeking) return;
+    _lastTimeUpdateAt = Date.now(); // FIX-5: stall watchdog heartbeat
     const current = audio.currentTime || 0;
     const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
       ? audio.duration
@@ -2142,17 +2385,36 @@
       _lastEndedTrackId = currentSong.id;
     }
 
-    if (isRepeat) {
-      console.log(`[Player] Repeat mode: replaying "${songTitle}"`);
+    // FIX-1: 3-state repeat
+    if (repeatMode === 'one') {
+      console.log(`[Player] Repeat One: replaying "${songTitle}"`);
       audio.currentTime = 0;
       audio.play().catch(err => console.warn('[Player] Repeat play error:', err));
     } else {
+      // 'off' and 'all' both advance via playNextTrack (which handles wrap/stop internally)
       console.log('[Player] Advancing automatically to next song in queue');
       playNextTrack(true);
     }
   }
 
   audio.addEventListener('ended', handleSongEnded);
+
+  // FIX-5: Network stall watchdog.
+  // If audio is supposed to be playing but timeupdate hasn't fired for 8+ seconds,
+  // it means the network stalled or the decoder hung. Attempt recovery by re-seeking.
+  setInterval(() => {
+    if (!isPlaying || audio.paused || isSeeking || _isTransitioning) return;
+    if (audio.readyState >= 3) return; // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA — all good
+    const stallDuration = Date.now() - _lastTimeUpdateAt;
+    if (_lastTimeUpdateAt > 0 && stallDuration > 8000) {
+      console.warn('[Player] Stall detected! readyState=' + audio.readyState + ', stalled for ' + Math.round(stallDuration / 1000) + 's. Attempting recovery...');
+      try {
+        const currentTime = audio.currentTime;
+        audio.currentTime = currentTime; // Re-seek to same position to kick the decoder
+        audio.play().catch(() => {});
+      } catch (e) {}
+    }
+  }, 2000);
 
   // FIX-8: Loading / buffering state management.
   // Shows a 'loading' CSS class on the play buttons during network stalls so users
@@ -2346,8 +2608,8 @@
     barHeartBtn.addEventListener('click', () => {
       if (currentSong) {
         toggleLikeSong(currentSong.id);
-      } else if (currentTrackIndex >= 0 && currentPlaylist[currentTrackIndex]) {
-        toggleLikeSong(currentPlaylist[currentTrackIndex].id);
+      } else if (currentTrackIndex >= 0 && activePlaybackPlaylist[currentTrackIndex]) {
+        toggleLikeSong(activePlaybackPlaylist[currentTrackIndex].id);
       }
     });
   }
@@ -2357,8 +2619,8 @@
       e.stopPropagation();
       if (currentSong) {
         toggleLikeSong(currentSong.id);
-      } else if (currentTrackIndex >= 0 && currentPlaylist[currentTrackIndex]) {
-        toggleLikeSong(currentPlaylist[currentTrackIndex].id);
+      } else if (currentTrackIndex >= 0 && activePlaybackPlaylist[currentTrackIndex]) {
+        toggleLikeSong(activePlaybackPlaylist[currentTrackIndex].id);
       }
     });
   }
@@ -2372,30 +2634,61 @@
 
   barBtnShuffle.addEventListener('click', () => {
     isShuffle = !isShuffle;
+    if (isShuffle && activePlaybackPlaylist.length > 0) {
+      // FIX-3: Generate shuffle and update version so next/prev use the fresh order
+      shuffleQueue = generateShuffleOrder(activePlaybackPlaylist.length, currentTrackIndex >= 0 ? currentTrackIndex : 0);
+      shuffleQueueVersion = shufflePlaylistVersion;
+      shuffleIndex = 0;
+    }
     barBtnShuffle.classList.toggle('active', isShuffle);
     barBtnShuffle.title = isShuffle ? 'Disable shuffle' : 'Enable shuffle';
     showToast(isShuffle ? 'Shuffle is ON' : 'Shuffle is OFF');
   });
 
+  // FIX-1: 3-state repeat cycle: off → all → one → off
+  function updateRepeatUI() {
+    if (repeatMode === 'off') {
+      barBtnRepeat.classList.remove('active', 'repeat-one');
+      barBtnRepeat.title = 'Enable repeat all';
+    } else if (repeatMode === 'all') {
+      barBtnRepeat.classList.add('active');
+      barBtnRepeat.classList.remove('repeat-one');
+      barBtnRepeat.title = 'Repeat all — click for repeat one';
+    } else { // 'one'
+      barBtnRepeat.classList.add('active', 'repeat-one');
+      barBtnRepeat.title = 'Repeat one — click to disable';
+    }
+  }
+
   barBtnRepeat.addEventListener('click', () => {
-    isRepeat = !isRepeat;
-    barBtnRepeat.classList.toggle('active', isRepeat);
-    barBtnRepeat.title = isRepeat ? 'Disable repeat' : 'Enable repeat';
-    showToast(isRepeat ? 'Repeat Track is ON' : 'Repeat is OFF');
+    if (repeatMode === 'off') repeatMode = 'all';
+    else if (repeatMode === 'all') repeatMode = 'one';
+    else repeatMode = 'off';
+    updateRepeatUI();
+    const messages = { off: 'Repeat is OFF', all: 'Repeat All is ON', one: 'Repeat One is ON' };
+    showToast(messages[repeatMode]);
   });
 
   btnBigPlay.addEventListener('click', () => {
+    // FIX-2: Big Play commits the browsing playlist to the active playback queue
     if (currentPlaylist.length > 0) {
+      activePlaybackPlaylist = [...currentPlaylist];
+      shufflePlaylistVersion++;
       playTrackAtIndex(0);
     }
   });
 
   btnShufflePlaylist.addEventListener('click', () => {
     if (currentPlaylist.length > 0) {
+      // FIX-2: Shuffle Play also commits browsing playlist to active playback queue
+      activePlaybackPlaylist = [...currentPlaylist];
+      shufflePlaylistVersion++;
       isShuffle = true;
       barBtnShuffle.classList.add('active');
-      const r = Math.floor(Math.random() * currentPlaylist.length);
-      playTrackAtIndex(r);
+      shuffleQueue = generateShuffleOrder(activePlaybackPlaylist.length, 0);
+      shuffleQueueVersion = shufflePlaylistVersion;
+      shuffleIndex = 0;
+      playTrackAtIndex(shuffleQueue[0]);
     }
   });
 
@@ -2410,8 +2703,7 @@
   // Topbar Navigation Buttons
   document.getElementById('btnNavHome').addEventListener('click', () => {
     currentRoute = 'home';
-    if (mainSearchWrap) mainSearchWrap.classList.remove('search-route-active');
-    if (mobileHeaderChips) mobileHeaderChips.style.display = '';
+    exitSearchView();
     viewPlaylist.classList.remove('active');
     viewSearch.classList.remove('active');
     viewArtist.classList.remove('active');
@@ -2419,6 +2711,13 @@
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('btnNavHome').classList.add('active');
   });
+
+  const btnNavBrandHome = document.getElementById('btnNavBrandHome');
+  if (btnNavBrandHome) {
+    btnNavBrandHome.addEventListener('click', () => {
+      document.getElementById('btnNavHome').click();
+    });
+  }
 
   document.getElementById('btnNavSearch').addEventListener('click', () => {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -2445,14 +2744,18 @@
     );
   });
 
-  document.getElementById('itemAllTracks').addEventListener('click', () => {
-    openPlaylistView(
-      'Cloudinary Master Collection',
-      `Original master audio recordings (${allSongs.length} tracks) synced directly from Cloudinary`,
-      allSongs[0] ? allSongs[0].cover_image_url : null,
-      allSongs
-    );
-  });
+  const _itemAllTracks = document.getElementById('itemAllTracks');
+  if (_itemAllTracks) {
+    _itemAllTracks.addEventListener('click', () => {
+      const sorted = getAlphabeticalSongs();
+      openPlaylistView(
+        'All Songs',
+        `Complete library with ${sorted.length} songs in alphabetical order`,
+        sorted[0] ? sorted[0].cover_image_url : null,
+        sorted
+      );
+    });
+  }
 
   // "Show All" / Category Pills
   document.querySelectorAll('.show-all-link').forEach(link => {
@@ -2505,28 +2808,30 @@
     isRightPanelOpen = true;
     currentRightPanelTab = viewName;
 
+    const rightPanelTitle = document.getElementById('rightPanelTitle');
     if (viewName === 'queue') {
-      nowPlayingView.classList.add('hidden');
-      queueView.classList.remove('hidden');
-      document.getElementById('rightPanelTitle').textContent = 'Queue';
+      if (nowPlayingView) nowPlayingView.classList.add('hidden');
+      if (queueView) queueView.classList.remove('hidden');
+      if (rightPanelTitle) rightPanelTitle.textContent = 'Queue';
       btnToggleQueue.classList.add('active');
       btnToggleNowPlaying.classList.remove('active');
       renderQueueView();
     } else {
-      queueView.classList.add('hidden');
-      nowPlayingView.classList.remove('hidden');
-      document.getElementById('rightPanelTitle').textContent = 'Now playing';
+      if (queueView) queueView.classList.add('hidden');
+      if (nowPlayingView) nowPlayingView.classList.remove('hidden');
+      if (rightPanelTitle) rightPanelTitle.textContent = 'Now playing';
       btnToggleNowPlaying.classList.add('active');
       btnToggleQueue.classList.remove('active');
     }
   }
 
   function renderQueueView() {
-    if (currentTrackIndex >= 0 && currentPlaylist[currentTrackIndex] && queueNowPlayingRow) {
-      const cur = currentPlaylist[currentTrackIndex];
+    // FIX-2: Use activePlaybackPlaylist (what actually plays) not currentPlaylist (browsing)
+    if (currentTrackIndex >= 0 && activePlaybackPlaylist[currentTrackIndex] && queueNowPlayingRow) {
+      const cur = activePlaybackPlaylist[currentTrackIndex];
       queueNowPlayingRow.innerHTML = `
         <div class="next-track-row" style="margin-bottom: 16px;">
-          <img class="row-thumb" src="${cur.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=80'}" alt="${cur.title}">
+          <img class="row-thumb" src="${cur.cover_image_url || DEFAULT_SONG_COVER}" alt="${cur.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <div class="row-text">
             <span class="row-song-title" style="color: #1db954;">${cur.title}</span>
             <span class="row-artist-name">${cur.artist}</span>
@@ -2536,10 +2841,10 @@
     }
 
     if (queueUpcomingRows) {
-      const upcoming = currentPlaylist.slice(currentTrackIndex + 1);
+      const upcoming = activePlaybackPlaylist.slice(currentTrackIndex + 1);
       queueUpcomingRows.innerHTML = upcoming.map((s, i) => `
         <div class="next-track-row" style="margin-bottom: 10px; cursor: pointer;" data-offset="${i + 1}">
-          <img class="row-thumb" src="${s.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=80'}" alt="${s.title}">
+          <img class="row-thumb" src="${s.cover_image_url || DEFAULT_SONG_COVER}" alt="${s.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <div class="row-text">
             <span class="row-song-title">${s.title}</span>
             <span class="row-artist-name">${s.artist}</span>
@@ -2590,7 +2895,7 @@
         setPlayingState(false);
         sleepTimerMinutes = 0;
         if (fsBtnTimer) fsBtnTimer.classList.remove('active');
-        showToast('⏱ Sleep timer expired. Spotkify audio paused.');
+        showToast('⏱ Sleep timer expired. Dheemafy audio paused.');
       }, sleepTimerMinutes * 60 * 1000);
     } else {
       if (fsBtnTimer) fsBtnTimer.classList.remove('active');
@@ -2598,12 +2903,12 @@
     }
   }
 
-  // Fullscreen Mode (1:1 Match to Spotify Mobile App - Image 2)
+  // Fullscreen Mode (Now Playing page)
   function openFullscreen() {
     fullscreenModal.classList.remove('hidden');
     if (btnFullscreen) btnFullscreen.classList.add('active');
-    
-    // Sync current state
+
+    // Sync current playback state to fullscreen controls
     if (fsPlaySvg && fsPauseSvg) {
       fsPlaySvg.classList.toggle('hidden', isPlaying);
       fsPauseSvg.classList.toggle('hidden', !isPlaying);
@@ -2613,24 +2918,22 @@
     if (fsBtnTimer) fsBtnTimer.classList.toggle('active', sleepTimerMinutes > 0);
 
     if (currentSong) {
-      const coverArt = currentSong.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600';
+      const coverArt = currentSong.cover_image_url || DEFAULT_SONG_COVER;
+      // Artwork: updates both the large center image and the small meta-row thumbnail
       if (fsCoverImg) fsCoverImg.src = coverArt;
       if (fsThumbImg) fsThumbImg.src = coverArt;
       if (fsBackdrop) fsBackdrop.style.backgroundImage = `url('${coverArt}')`;
       if (fsTrackTitle) fsTrackTitle.textContent = currentSong.title || '';
       if (fsArtistName) fsArtistName.textContent = currentSong.artist || '';
-      if (fsHeaderContextSub) fsHeaderContextSub.textContent = 'Playing from Search';
+      if (fsHeaderContextSub) fsHeaderContextSub.textContent = 'Playing from Dheemafy';
       if (fsHeaderPlaylistName) {
-        const key = currentSong.movie || currentSong.title || 'neelothi';
-        fsHeaderPlaylistName.textContent = `"${key.toLowerCase()}" in Search`;
+        const key = currentSong.movie || currentSong.title || 'Dheemafy';
+        fsHeaderPlaylistName.textContent = `"${key.toLowerCase()}"`;
       }
       if (fsAddSvgPlus && fsAddSvgCheck) {
         fsAddSvgPlus.classList.toggle('hidden', Boolean(currentSong.is_liked));
         fsAddSvgCheck.classList.toggle('hidden', !Boolean(currentSong.is_liked));
       }
-      const lyricsData = getLyricsForSong(currentSong);
-      if (fsFloatingLyric) fsFloatingLyric.textContent = lyricsData.floating;
-      if (fsLyricsPeekText) fsLyricsPeekText.innerHTML = lyricsData.preview;
       updateMediaSession(currentSong);
     }
   }
@@ -2679,6 +2982,11 @@
   if (fsBtnShuffle) {
     addFastTouchListener(fsBtnShuffle, () => {
       isShuffle = !isShuffle;
+      if (isShuffle && activePlaybackPlaylist.length > 0) {
+        shuffleQueue = generateShuffleOrder(activePlaybackPlaylist.length, currentTrackIndex >= 0 ? currentTrackIndex : 0);
+        shuffleQueueVersion = shufflePlaylistVersion; // FIX-3
+        shuffleIndex = 0;
+      }
       fsBtnShuffle.classList.toggle('active', isShuffle);
       if (fsShuffleDot) fsShuffleDot.style.display = isShuffle ? 'block' : 'none';
       if (barBtnShuffle) barBtnShuffle.classList.toggle('active', isShuffle);
@@ -2731,11 +3039,7 @@
     });
   }
 
-  if (fsLyricsPeekCard) {
-    addFastTouchListener(fsLyricsPeekCard, () => {
-      showToast('Live Lyrics synced with master audio playback');
-    });
-  }
+  // fsLyricsPeekCard listener removed — lyrics section removed from Now Playing page.
 
   // Interactive seek and drag on Fullscreen Scrubber
   let isFsSeeking = false;
@@ -2748,7 +3052,7 @@
     const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
       ? audio.duration
       : (currentSong && currentSong.duration ? currentSong.duration : 0);
-    
+
     if (fsProgressFill) fsProgressFill.style.width = `${pos * 100}%`;
     if (fsProgressThumb) fsProgressThumb.style.left = `${pos * 100}%`;
     if (fsCurrentTime) fsCurrentTime.textContent = formatDuration(pos * total);
@@ -2842,19 +3146,23 @@
     try {
       const didUpdate = await SongCatalogStore.checkVersionAndSyncIfNeeded();
       if (didUpdate) {
-        console.log(`[Spotkify AutoUpdate] Discovered library updates: ${allSongs.length} songs available`);
+        console.log(`[Dheemafy AutoUpdate] Discovered library updates: ${allSongs.length} songs available`);
         const homeRes = await fetch('/api/home');
         const homeJson = await homeRes.json();
         homeData = (homeJson && homeJson.data) || {};
         renderHomeView();
         renderSidebarPlaylists();
       }
-    } catch (e) {}
+    } catch (e) { }
   }, 30000);
 
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
       console.log('[Player] Page hidden / screen locked — keeping audio active');
+      // Ensure MediaSession is up-to-date so lock screen shows correct song
+      if (currentSong) {
+        try { updateMediaSession(currentSong); } catch (_) {}
+      }
       return;
     }
 
@@ -2864,7 +3172,8 @@
       try {
         updateAllPlayerUI(currentSong);
         setPlayingState(!audio.paused);
-      } catch (_) {}
+        updateMediaSession(currentSong);
+      } catch (_) { }
     }
 
     if (!document.hidden && isAuthenticated()) {
@@ -2877,19 +3186,43 @@
           renderHomeView();
           renderSidebarPlaylists();
         }
-      } catch (e) {}
+      } catch (e) { }
+    }
+  });
+
+  // FIX-4: Page Lifecycle API handlers (Android Chrome background freezing/thawing)
+  // 'freeze' fires when the browser freezes the page to save resources.
+  // 'resume' fires when the page is brought back to life.
+  document.addEventListener('freeze', () => {
+    console.log('[Player] Page lifecycle: freeze — ensuring MediaSession is active');
+    if (currentSong && isPlaying) {
+      try { updateMediaSession(currentSong); } catch (_) {}
+    }
+  });
+
+  document.addEventListener('resume', () => {
+    console.log('[Player] Page lifecycle: resume — re-syncing player state');
+    if (currentSong) {
+      try {
+        updateAllPlayerUI(currentSong);
+        setPlayingState(!audio.paused);
+        updateMediaSession(currentSong);
+      } catch (_) {}
     }
   });
 
   // Topbar scroll background effect
-  if (mainScrollView && topbar) {
-    mainScrollView.addEventListener('scroll', () => {
-      if (mainScrollView.scrollTop > 30) {
-        topbar.classList.add('scrolled');
-      } else {
-        topbar.classList.remove('scrolled');
-      }
-    });
+  if (mainScrollView) {
+    const topbarEl = document.getElementById('topbar') || document.getElementById('spotifyGlobalTopbar');
+    if (topbarEl) {
+      mainScrollView.addEventListener('scroll', () => {
+        if (mainScrollView.scrollTop > 30) {
+          topbarEl.classList.add('scrolled');
+        } else {
+          topbarEl.classList.remove('scrolled');
+        }
+      });
+    }
   }
 
   // Keyboard Shortcuts
@@ -2943,7 +3276,7 @@
   function openTrackContextSheet(song) {
     if (!trackContextSheet || !song) return;
     currentContextSong = song;
-    if (contextTrackCover) contextTrackCover.src = song.cover_image_url || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100';
+    if (contextTrackCover) contextTrackCover.src = song.cover_image_url || DEFAULT_SONG_COVER;
     if (contextTrackTitle) contextTrackTitle.textContent = song.title;
     if (contextTrackArtist) contextTrackArtist.textContent = song.artist;
     if (btnContextLikeText) {
@@ -3033,15 +3366,15 @@
         miniHasSwiped = false;
         return;
       }
-      if (e.target.closest('#barHeartBtn') || 
-          e.target.closest('#mobileMiniPrevBtn') || 
-          e.target.closest('#mobileMiniPlayBtn') || 
-          e.target.closest('#mobileMiniNextBtn') || 
-          e.target.closest('#mobileConnectBtn') || 
-          e.target.closest('#mobileAddBtn') || 
-          e.target.closest('#mobileDeviceBadge') || 
-          e.target.closest('.player-center') || 
-          e.target.closest('.player-right')) {
+      if (e.target.closest('#barHeartBtn') ||
+        e.target.closest('#mobileMiniPrevBtn') ||
+        e.target.closest('#mobileMiniPlayBtn') ||
+        e.target.closest('#mobileMiniNextBtn') ||
+        e.target.closest('#mobileConnectBtn') ||
+        e.target.closest('#mobileAddBtn') ||
+        e.target.closest('#mobileDeviceBadge') ||
+        e.target.closest('.player-center') ||
+        e.target.closest('.player-right')) {
         return;
       }
       if (window.innerWidth <= 850 && btnFullscreen) {
@@ -3092,7 +3425,7 @@
   if (btnGetPremium) {
     btnGetPremium.addEventListener('click', () => {
       closePremiumSheet();
-      showToast('🎉 Spotkify Premium Individual Activated! High-fidelity master streaming enabled.');
+      showToast('🎉 Dheemafy Premium Individual Activated! High-fidelity master streaming enabled.');
     });
   }
 
@@ -3180,7 +3513,7 @@
           const el = document.getElementById('sectionStartListening');
           if (el) el.scrollIntoView({ behavior: 'smooth' });
         } else if (cat === 'podcasts') {
-          showToast('Podcasts coming soon to Spotkify!');
+          showToast('Podcasts coming soon to Dheemafy!');
         } else {
           mainScrollView.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -3236,11 +3569,11 @@
         localStorage.setItem('spotkify_user', 'sharu');
         try {
           window.history.replaceState({}, document.title, window.location.pathname);
-        } catch (e) {}
+        } catch (e) { }
       } else if (qUser && loginUsername) {
         loginUsername.value = qUser;
       }
-    } catch (err) {}
+    } catch (err) { }
 
     if (isAuthenticated()) {
       document.documentElement.classList.add('spotkify-unlocked');
@@ -3367,7 +3700,7 @@
         }
 
         updateUserProfileDisplay(displayName);
-        showToast(`Welcome to Spotkify, ${displayName}!`);
+        showToast(`Welcome to Dheemafy, ${displayName}!`);
         initAppData();
       } catch (err) {
         console.warn('Login request failed:', err);
@@ -3434,7 +3767,7 @@
 
     function toggleProfileMenu(e) {
       if (e) {
-        e.stopPropagation();
+        if (e.stopPropagation) e.stopPropagation();
       }
       if (isProfileMenuOpen()) {
         closeProfileMenu();
@@ -3443,45 +3776,28 @@
       }
     }
 
+    window.spotkifyToggleProfile = toggleProfileMenu;
+
     if (btnProfileMenu && profileDropdown) {
-      btnProfileMenu.addEventListener('click', (e) => {
+      addFastTouchListener(btnProfileMenu, (e) => {
         toggleProfileMenu(e);
       });
     }
 
     // Tapping the full-screen transparent backdrop closes the dropdown
     if (profileDropdownBackdrop) {
-      profileDropdownBackdrop.addEventListener('click', (e) => {
-        e.stopPropagation();
+      addFastTouchListener(profileDropdownBackdrop, (e) => {
         closeProfileMenu();
       });
-      profileDropdownBackdrop.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
-        closeProfileMenu();
-      }, { passive: true });
     }
 
-    // Dismiss dropdown when touching or clicking ANYWHERE on the screen outside the dropdown
-    const handleOutsideInteraction = (e) => {
+    // Dismiss dropdown when clicking outside on desktop
+    document.addEventListener('click', (e) => {
       if (!isProfileMenuOpen()) return;
-      const target = e.target instanceof Element ? e.target : (e.target ? e.target.parentElement : null);
-      if (!target) return;
-
-      // Do nothing if interacting inside the profile menu
-      if (profileDropdown && profileDropdown.contains(target)) return;
-
-      // Do nothing if interacting with the avatar toggle button itself
-      if (btnProfileMenu && btnProfileMenu.contains(target)) return;
-      if (btnMobileUserAvatar && btnMobileUserAvatar.contains(target)) return;
-
-      // Anywhere else on the screen was touched/clicked -> close dropdown immediately
+      if (profileDropdown && profileDropdown.contains(e.target)) return;
+      if (btnProfileMenu && btnProfileMenu.contains(e.target)) return;
       closeProfileMenu();
-    };
-
-    // Capture phase listeners ensure dismissal on mobile and desktop even if child elements stop propagation
-    window.addEventListener('click', handleOutsideInteraction, true);
-    window.addEventListener('touchstart', handleOutsideInteraction, { capture: true, passive: true });
-    window.addEventListener('pointerdown', handleOutsideInteraction, true);
+    });
 
     // Escape key closes the dropdown
     document.addEventListener('keydown', (e) => {
@@ -3491,40 +3807,47 @@
     });
 
     // Logout Button Action
+    function doLogout(e) {
+      if (e) {
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+      }
+      closeProfileMenu();
+
+      localStorage.removeItem('spotkify_auth');
+      localStorage.removeItem('spotkify_user');
+      localStorage.removeItem('spotkify_token');
+      sessionStorage.removeItem('spotkify_auth');
+      sessionStorage.removeItem('spotkify_user');
+      sessionStorage.removeItem('spotkify_token');
+
+      // Stop audio immediately
+      if (audio && !audio.paused) {
+        audio.pause();
+        isPlaying = false;
+        setPlayingState(false);
+      }
+
+      // Lock screen and display login gate
+      document.documentElement.classList.remove('spotkify-unlocked');
+      document.body.classList.add('locked');
+      if (loginGate) {
+        loginGate.classList.remove('fade-out');
+        loginGate.style.display = 'flex';
+      }
+      if (loginPassword) loginPassword.value = '';
+      if (loginAlertBox) loginAlertBox.classList.add('hidden');
+      if (loginUsername) {
+        loginUsername.value = '';
+        loginUsername.focus();
+      }
+      showToast('Logged out of Dheemafy');
+    }
+
+    window.spotkifyDoLogout = doLogout;
+
     if (btnLogout) {
-      btnLogout.addEventListener('click', (e) => {
-        if (e) e.stopPropagation();
-        closeProfileMenu();
-
-        localStorage.removeItem('spotkify_auth');
-        localStorage.removeItem('spotkify_user');
-        localStorage.removeItem('spotkify_token');
-        sessionStorage.removeItem('spotkify_auth');
-        sessionStorage.removeItem('spotkify_user');
-        sessionStorage.removeItem('spotkify_token');
-
-        // Stop audio immediately
-        if (audio && !audio.paused) {
-          audio.pause();
-          isPlaying = false;
-          setPlayingState(false);
-        }
-
-        // Lock screen and display login gate
-        document.documentElement.classList.remove('spotkify-unlocked');
-        document.body.classList.add('locked');
-        if (loginGate) {
-          loginGate.classList.remove('fade-out');
-          loginGate.style.display = 'flex';
-        }
-        if (loginPassword) loginPassword.value = '';
-        if (loginAlertBox) loginAlertBox.classList.add('hidden');
-        if (loginUsername) {
-          loginUsername.value = '';
-          loginUsername.focus();
-        }
-        showToast('Logged out of Spotkify');
-      });
+      addFastTouchListener(btnLogout, doLogout);
     }
   }
 
@@ -3544,7 +3867,7 @@
       if (hasSrc && audio.paused && !isPlaying && !_isTransitioning) {
         audio.play().then(() => {
           if (!isPlaying && !_isTransitioning) audio.pause();
-        }).catch(() => {});
+        }).catch(() => { });
       }
     };
     window.addEventListener('touchstart', unlock, { capture: true, passive: true });
@@ -3670,7 +3993,7 @@
           }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Fallback: no labelled device found (privacy restrictions or no permission)
     if (!deviceName) {

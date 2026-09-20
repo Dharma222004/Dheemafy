@@ -59,7 +59,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: 'Spotkify Music Streaming API',
+    service: 'Dheemafy Music Streaming API',
     version: '1.0.0'
   });
 });
@@ -114,7 +114,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 let server = null;
 if (require.main === module && !process.env.VERCEL) {
   server = app.listen(PORT, HOST, () => {
-    console.log(`[Server] Spotkify API server listening on http://${HOST}:${PORT} (and http://localhost:${PORT})`);
+    console.log(`[Server] Dheemafy API server listening on http://${HOST}:${PORT} (and http://localhost:${PORT})`);
   });
 }
 

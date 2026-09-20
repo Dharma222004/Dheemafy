@@ -205,15 +205,16 @@ async function syncCloudinaryCatalog(customFolder = 'Songs') {
         }
 
         // Extract title portion if formatted as Artists_-_Title
-        let rawTitlePart = pubId;
+        let rawPubId = pubId.replace(/Vivek_-_Mervin/g, 'Vivek-Mervin');
+        let rawTitlePart = rawPubId;
         let rawArtistPart = '';
-        if (pubId.includes('_-_')) {
-          const parts = pubId.split('_-_');
-          rawArtistPart = parts[0];
+        if (rawPubId.includes('_-_')) {
+          const parts = rawPubId.split('_-_');
+          rawArtistPart = parts[0].replace('Vivek-Mervin', 'Vivek - Mervin');
           rawTitlePart = parts.slice(1).join('_-_');
-        } else if (pubId.includes(' - ')) {
-          const parts = pubId.split(' - ');
-          rawArtistPart = parts[0];
+        } else if (rawPubId.includes(' - ')) {
+          const parts = rawPubId.split(' - ');
+          rawArtistPart = parts[0].replace('Vivek-Mervin', 'Vivek - Mervin');
           rawTitlePart = parts.slice(1).join(' - ');
         }
 
@@ -228,9 +229,8 @@ async function syncCloudinaryCatalog(customFolder = 'Songs') {
           const normTitle = normalizeStr(meta.title);
           if (!normTitle || normTitle.length < 2) continue;
 
-          // Check if title matches
-          const titleMatches = (normTitlePart === normTitle) ||
-            (normTitle.length >= 3 && new RegExp('(?:^|\\s|_)' + normTitle.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '(?:$|\\s|_)', 'i').test(normTitlePart));
+          // Check if title matches strictly
+          const titleMatches = (normTitlePart === normTitle);
 
           if (titleMatches) {
             if (rawArtistPart) {
@@ -245,24 +245,6 @@ async function syncCloudinaryCatalog(customFolder = 'Songs') {
             } else {
               matchedMeta = meta;
               break;
-            }
-          }
-        }
-
-        // Secondary match: Check if public ID contains normalized title (min 4 chars) and an artist matches
-        if (!matchedMeta && rawArtistPart) {
-          for (const meta of metadataSongs) {
-            const normTitle = normalizeStr(meta.title);
-            if (!normTitle || normTitle.length < 4) continue;
-            if (normPubId.includes(normTitle)) {
-              const hasArtistMatch = meta.artists.some(a => {
-                const normA = normalizeStr(a);
-                return normA.length >= 3 && normArtistPart.includes(normA);
-              });
-              if (hasArtistMatch) {
-                matchedMeta = meta;
-                break;
-              }
             }
           }
         }
@@ -381,12 +363,31 @@ async function syncCloudinaryCatalog(customFolder = 'Songs') {
       }
     }
 
-    // Update aggregated album duration and song counts
+    // 5. Deactivate any songs in database that are NOT in Cloudinary to prevent 404 playback errors
+    try {
+      const activePublicIds = new Set(resources.map(r => r.public_id));
+      const allDbSongs = db.prepare('SELECT id, cloudinary_public_id, is_active FROM media_file').all();
+      const deactivateStmt = db.prepare('UPDATE media_file SET is_active = 0 WHERE id = ?');
+      let deactivatedCount = 0;
+      for (const song of allDbSongs) {
+        if (!activePublicIds.has(song.cloudinary_public_id)) {
+          if (song.is_active !== 0) {
+            deactivateStmt.run(song.id);
+            deactivatedCount++;
+          }
+        }
+      }
+      console.log(`[Sync] Verified ${activePublicIds.size} active Cloudinary songs. Deactivated ${deactivatedCount} missing/un-uploaded songs.`);
+    } catch (deactErr) {
+      console.warn('[Sync] Note during deactivating missing songs:', deactErr.message);
+    }
+
+    // Update aggregated album duration and song counts (active songs only)
     try {
       db.exec(`
         UPDATE album SET
-          duration = (SELECT COALESCE(SUM(duration), 0) FROM media_file WHERE album_id = album.id),
-          song_count = (SELECT COUNT(*) FROM media_file WHERE album_id = album.id)
+          duration = (SELECT COALESCE(SUM(duration), 0) FROM media_file WHERE album_id = album.id AND (is_active = 1 OR is_active IS NULL)),
+          song_count = (SELECT COUNT(*) FROM media_file WHERE album_id = album.id AND (is_active = 1 OR is_active IS NULL))
       `);
     } catch (albErr) {
       console.warn('[Sync] Album aggregation update note:', albErr.message);
@@ -491,9 +492,9 @@ async function syncCloudinaryCatalog(customFolder = 'Songs') {
  * Auto-Sync Engine:
  * Ensures catalog is fresh. Automatically runs on cold start or if cache is older than 2 minutes.
  */
-let lastSyncTime = 0;
+let lastSyncTime = Date.now();
 let isSyncing = false;
-const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+const AUTO_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 async function ensureFreshCatalog(force = false) {
   try {

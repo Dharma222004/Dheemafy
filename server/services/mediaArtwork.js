@@ -3,28 +3,30 @@
  * High-resolution, permanent images for Tamil singers, music directors, and movie soundtracks.
  */
 
+const DEFAULT_COVER = '/images/default_cover.svg';
+
 const ARTIST_PORTRAITS = {
   'vivek': '/images/artists/vivek.jpg',
   'anirudh': '/images/artists/anirudh.jpg',
   'anirudh ravichander': '/images/artists/anirudh.jpg',
-  'sid sriram': 'https://upload.wikimedia.org/wikipedia/commons/c/c3/Sid_Sriram.jpg',
-  'santhosh narayanan': 'https://upload.wikimedia.org/wikipedia/commons/a/a2/Santhosh_Narayanan_-_WIki_profile.jpg',
-  'yuvan shankar raja': 'https://upload.wikimedia.org/wikipedia/commons/b/b6/Yuvan_Shankar_Raja_exclusive_HQ_Photos_Silverscreen.jpg',
-  'a.r. rahman': 'https://upload.wikimedia.org/wikipedia/commons/1/10/AR_Rahman_at_Premier_Futsal_Press_Meet_%28cropped%29.jpg',
-  'pradeep kumar': 'https://upload.wikimedia.org/wikipedia/commons/0/0a/Pradeep_Rangaswamy_Kumar.png',
-  'dhanush': 'https://upload.wikimedia.org/wikipedia/commons/8/89/Dhanush_at_the_%E2%80%98Asuran%E2%80%99_Success_Meet_%28cropped%29.jpg',
-  'shreya ghoshal': 'https://upload.wikimedia.org/wikipedia/commons/a/a0/Shreya_Ghoshal_Behindwoods_Gold_Icons_Awards_2023_%28cropped%29.jpg',
-  'harris jayaraj': 'https://upload.wikimedia.org/wikipedia/commons/8/82/Harris_Jayaraj_at_Gethu_Audio_Launch_%28cropped%29.jpg',
-  'sean roldan': 'https://upload.wikimedia.org/wikipedia/commons/6/63/Sean_Roldan.jpg',
-  'ilaiyaraaja': 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Ilaiyaraaja_at_Merku_Thodarchi_Malai_Press_Meet_%28cropped%29.jpg',
-  'hiphop tamizha': 'https://upload.wikimedia.org/wikipedia/commons/8/80/Hiphop_Tamizha_Aambala_audio_launch_%28cropped%29.jpg',
-  'shakthisree gopalan': 'https://upload.wikimedia.org/wikipedia/commons/a/a2/Shakthisree_Gopalan.jpg',
-  'saindhavi': 'https://upload.wikimedia.org/wikipedia/commons/2/2a/Saindhavi_Prakash.jpg',
-  'vijay antony': 'https://upload.wikimedia.org/wikipedia/commons/6/6b/Vijay_Antony_and_Arjun_at_the_%E2%80%98Kolaigaran%E2%80%99_Press_Meet_%28cropped%29.jpg',
-  'jonita gandhi': 'https://upload.wikimedia.org/wikipedia/commons/7/76/Jonita_Gandhi_snapped_at_an_event_in_Juhu_%28cropped%29.jpg',
-  's. p. balasubrahmanyam': 'https://upload.wikimedia.org/wikipedia/commons/6/67/S._P._Balasubrahmanyam_at_the_%27Gurkha%27_Audio_Launch.jpg',
-  'andrea jeremiah': 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Andrea_Jeremiah_%28cropped%29.jpg',
-  'chinmayi': 'https://upload.wikimedia.org/wikipedia/commons/e/ea/Chinmayi_Sripada.JPG',
+  'sid sriram': DEFAULT_COVER,
+  'santhosh narayanan': DEFAULT_COVER,
+  'yuvan shankar raja': DEFAULT_COVER,
+  'a.r. rahman': DEFAULT_COVER,
+  'pradeep kumar': DEFAULT_COVER,
+  'dhanush': DEFAULT_COVER,
+  'shreya ghoshal': DEFAULT_COVER,
+  'harris jayaraj': DEFAULT_COVER,
+  'sean roldan': DEFAULT_COVER,
+  'ilaiyaraaja': DEFAULT_COVER,
+  'hiphop tamizha': DEFAULT_COVER,
+  'shakthisree gopalan': DEFAULT_COVER,
+  'saindhavi': DEFAULT_COVER,
+  'vijay antony': DEFAULT_COVER,
+  'jonita gandhi': DEFAULT_COVER,
+  's. p. balasubrahmanyam': DEFAULT_COVER,
+  'andrea jeremiah': DEFAULT_COVER,
+  'chinmayi': DEFAULT_COVER,
   'g. v. prakash': '/images/artists/gvprakash.jpg',
   'g. v. prakash kumar': '/images/artists/gvprakash.jpg',
   'g.v. prakash': '/images/artists/gvprakash.jpg',
@@ -76,8 +78,6 @@ const MOVIE_SONG_COVERS = {
   'kanja poovu kannala': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&auto=format&fit=crop&q=80',
   'yaanji': 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80'
 };
-
-const DEFAULT_COVER = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80';
 
 /**
  * Get authentic portrait for an artist

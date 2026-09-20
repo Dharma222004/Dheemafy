@@ -96,21 +96,49 @@ body {
   transition: transform 0.2s;
 }
 
+.spotify-icon-wrap {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+  text-decoration: none;
+}
+
 .spotify-icon-wrap:hover {
-  transform: scale(1.06);
+  transform: scale(1.04);
 }
 
 .spotkify-topbar-logo {
   width: 36px;
   height: 36px;
   border-radius: 9px;
-  object-fit: contain;
+  object-fit: cover;
   transition: transform 0.2s ease, filter 0.2s ease;
-  filter: drop-shadow(0 0 8px rgba(0, 245, 160, 0.45));
+  filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.55));
 }
 
 .spotify-icon-wrap:hover .spotkify-topbar-logo {
-  filter: drop-shadow(0 0 14px rgba(0, 245, 160, 0.8));
+  filter: drop-shadow(0 0 16px rgba(0, 229, 255, 0.9));
+}
+
+.dheemafy-brand-name {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+  margin-left: 9px;
+  background: linear-gradient(135deg, #ffffff 40%, #00e5ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  user-select: none;
+  display: inline-block;
+  font-family: inherit;
+}
+
+@media (max-width: 600px) {
+  .dheemafy-brand-name {
+    display: none;
+  }
 }
 
 .topbar-home-btn {
@@ -1570,6 +1598,14 @@ body {
   object-fit: cover;
 }
 
+.mobile-only-heading {
+  display: none;
+}
+
+.desktop-only-heading {
+  display: inline;
+}
+
 .search-top-layout {
   display: grid;
   grid-template-columns: 2fr 3fr;
@@ -1932,6 +1968,19 @@ body {
   height: 4px;
   background-color: var(--spotify-green);
   border-radius: 50%;
+}
+
+/* Repeat One: show a "1" superscript above the repeat icon */
+.control-btn.repeat-one::before {
+  content: '1';
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--spotify-green);
+  line-height: 1;
+  pointer-events: none;
 }
 
 .play-pause-circle {
@@ -2871,13 +2920,22 @@ body {
    Matches Spotify Mobile App UI 1:1
    ========================================================================== */
 @media (max-width: 850px) {
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
   .spotify-app {
     padding: 0;
     gap: 0;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
   }
   .app-main-layout {
     grid-template-columns: 1fr;
     height: calc(100vh - 60px);
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
   }
   .left-sidebar, .right-sidebar {
     display: none !important;
@@ -2885,12 +2943,15 @@ body {
   .main-panel {
     border-radius: 0;
     height: 100%;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
   }
 
   /* Responsive Mobile Topbar (56px, Spotkify logo, Filter Chips, Default Profile Avatar) */
   .spotify-global-topbar {
     height: 56px !important;
-    padding: 0 14px !important;
+    padding: 0 12px !important;
     background-color: #121212 !important;
     display: flex !important;
     align-items: center !important;
@@ -2899,10 +2960,17 @@ body {
     position: sticky !important;
     top: 0 !important;
     z-index: 900 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
   }
   .topbar-left-controls {
     width: auto !important;
     gap: 8px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
   }
   .topbar-home-btn {
     display: none !important;
@@ -2910,10 +2978,12 @@ body {
   .spotkify-topbar-logo {
     width: 32px !important;
     height: 32px !important;
+    flex-shrink: 0 !important;
   }
   .topbar-center-search {
-    max-width: none !important;
-    flex: 1 !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
     margin: 0 !important;
     display: flex !important;
     align-items: center !important;
@@ -2923,8 +2993,77 @@ body {
   }
   .topbar-center-search .main-search-wrap.search-route-active {
     display: flex !important;
+    align-items: center !important;
     width: 100% !important;
-    height: 38px !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    background-color: #242424 !important;
+    border-radius: 500px !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+    transition: background-color 0.2s, border-color 0.2s !important;
+  }
+  .topbar-center-search .main-search-wrap.search-route-active:focus-within {
+    border-color: #ffffff !important;
+    background-color: #2a2a2a !important;
+  }
+  .topbar-center-search .main-search-wrap .search-input-icon {
+    position: static !important;
+    transform: none !important;
+    flex-shrink: 0 !important;
+    width: 18px !important;
+    height: 18px !important;
+    color: #b3b3b3 !important;
+    margin: 0 !important;
+    pointer-events: none !important;
+  }
+  .topbar-center-search .main-search-wrap.search-route-active input#spotifySearchInput {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 4px !important;
+    background: transparent !important;
+    border: none !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    color: #ffffff !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+  }
+  .topbar-center-search .main-search-wrap .search-browse-box-icon {
+    display: none !important;
+  }
+  .topbar-center-search .main-search-wrap .clear-search-btn {
+    position: static !important;
+    transform: none !important;
+    flex-shrink: 0 !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    margin-left: 4px !important;
+    transition: background 0.15s ease !important;
+  }
+  .topbar-center-search .main-search-wrap .clear-search-btn:active {
+    background: rgba(255, 255, 255, 0.35) !important;
+  }
+  .topbar-center-search .main-search-wrap .clear-search-btn.hidden {
+    display: none !important;
   }
   .mobile-header-chips {
     display: flex !important;
@@ -2933,19 +3072,85 @@ body {
     overflow-x: auto !important;
     scrollbar-width: none !important;
     width: 100% !important;
+    min-width: 0 !important;
   }
   .topbar-right-profile {
     width: auto !important;
     display: flex !important;
     align-items: center !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 1000 !important;
+  }
+  .spotify-global-topbar.search-route-active {
+    justify-content: flex-start !important;
+    gap: 10px !important;
+  }
+  .spotify-global-topbar.search-route-active .topbar-right-profile {
+    display: none !important;
+  }
+  .profile-avatar-pill {
+    cursor: pointer !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
   .profile-avatar-circle {
-    width: 32px !important;
-    height: 32px !important;
+    width: 36px !important;
+    height: 36px !important;
+    cursor: pointer !important;
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    background-color: #242424 !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  }
+  .profile-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(2px) !important;
+    -webkit-backdrop-filter: blur(2px) !important;
+    z-index: 9998 !important;
   }
   .profile-dropdown {
-    right: 8px !important;
-    top: 52px !important;
+    position: fixed !important;
+    right: 12px !important;
+    top: 60px !important;
+    width: 210px !important;
+    background-color: #282828 !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9) !important;
+    padding: 8px !important;
+    z-index: 9999 !important;
+    animation: dropdownIn 0.18s ease-out !important;
+  }
+  .dropdown-item.logout-action {
+    width: 100% !important;
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 0 12px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 82, 82, 0.1) !important;
+    color: #ff5252 !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    border: 1px solid rgba(255, 82, 82, 0.25) !important;
+    cursor: pointer !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    box-sizing: border-box !important;
+    margin-top: 4px !important;
+  }
+  .dropdown-item.logout-action:active {
+    background: rgba(255, 82, 82, 0.25) !important;
+    transform: scale(0.98) !important;
   }
   .desktop-home-flow {
     display: none !important;
@@ -3206,12 +3411,180 @@ body {
     text-align: right !important;
   }
 
-  #searchMiniRows .table-row {
+  /* ==========================================================================
+     MOBILE SEARCH VIEW - 1:1 AUTHENTIC SPOTIFY MOBILE UX
+     1-column vertical hierarchy:
+     1. Full-width Top result card with responsive cover, title, subtitle & play button
+     2. Clean list of matching songs in order (Thumbnail, Title, Artist, Duration, Heart)
+     ========================================================================== */
+  .mobile-only-heading {
+    display: inline !important;
+  }
+  .desktop-only-heading {
+    display: none !important;
+  }
+
+  .view-content#viewSearch {
+    padding: 12px 14px 140px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .genre-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .search-top-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+    margin-bottom: 20px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .top-result-col {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .search-songs-col {
+    display: none !important; /* Hide redundant 4-track mini-column on mobile; all songs display in search-full-table-wrap in continuous order */
+  }
+
+  .top-result-card {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 18px !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%), #181818 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    position: relative !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+    transition: background-color 0.2s ease, transform 0.15s ease !important;
+  }
+
+  .top-result-card:active {
+    background: #242424 !important;
+    transform: scale(0.99) !important;
+  }
+
+  .top-result-img {
+    width: 80px !important;
+    height: 80px !important;
+    border-radius: 8px !important;
+    object-fit: cover !important;
+    margin-bottom: 14px !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  .top-result-title {
+    font-size: 22px !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    margin-bottom: 6px !important;
+    color: #ffffff !important;
+    word-break: break-word !important;
+    letter-spacing: -0.02em !important;
+  }
+
+  .top-result-sub {
+    font-size: 13.5px !important;
+    color: #b3b3b3 !important;
+    line-height: 1.35 !important;
+    margin-bottom: 12px !important;
+    padding-right: 56px !important;
+    word-break: break-word !important;
+  }
+
+  .top-result-badge {
+    display: inline-block !important;
+    background-color: #000000 !important;
+    padding: 4px 12px !important;
+    border-radius: 500px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  .top-result-card .card-play-btn {
+    position: absolute !important;
+    right: 18px !important;
+    bottom: 18px !important;
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 50% !important;
+    background-color: var(--spotify-green) !important;
+    color: #000000 !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6) !important;
+    opacity: 1 !important;
+    transform: none !important;
+    cursor: pointer !important;
+    transition: transform 0.15s ease, background-color 0.15s ease !important;
+  }
+
+  .top-result-card .card-play-btn:active {
+    transform: scale(0.92) !important;
+    background-color: var(--spotify-green-hover) !important;
+  }
+
+  .search-full-table-wrap {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .search-full-table-wrap .search-section-title {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    margin: 16px 0 12px !important;
+    color: #ffffff !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  /* List of matching songs in mobile list order */
+  #searchTableRows {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #searchTableRows .table-row {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 12px !important;
-    padding: 8px 8px !important;
+    padding: 8px 10px !important;
+    min-height: 56px !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    background: transparent !important;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  #searchTableRows .table-row:active {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  #searchTableRows .table-row.playing {
+    background-color: rgba(29, 185, 84, 0.12) !important;
+  }
+
+  #searchTableRows .table-row.playing .row-song-title {
+    color: var(--spotify-green) !important;
   }
 
   /* Topbar header on Mobile */
@@ -4148,35 +4521,32 @@ body {
   line-height: 1.25;
 }
 
-/* Center Canvas / Floating Lyrics (Image 2) */
+/* Center Canvas / Main Artwork Area */
 .fs-canvas-area {
   position: relative;
   z-index: 10;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: flex-start;
-  padding: 12px 24px;
+  align-items: center;
+  padding: 8px 24px;
   box-sizing: border-box;
-  min-height: 120px;
+  min-height: 0;
   overflow: hidden;
 }
 
-.fs-floating-lyrics {
-  width: 100%;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.fs-floating-text {
-  font-size: clamp(20px, 5.5vw, 25px);
-  font-weight: 800;
-  color: #ffffff;
-  line-height: 1.35;
-  letter-spacing: -0.02em;
-  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.95);
-  margin: 0;
-  user-select: none;
+/* Main Artwork Image in Now Playing fullscreen */
+.fs-main-artwork {
+  width: min(72vw, 320px);
+  height: min(72vw, 320px);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75), 0 4px 16px rgba(0, 0, 0, 0.5);
+  display: block;
+  flex-shrink: 0;
+  transition: src 0.2s ease, opacity 0.3s ease;
 }
 
 /* Bottom Dock Area */
@@ -4474,54 +4844,20 @@ body {
   opacity: 0.8;
 }
 
-/* Bottom Peeking Lyrics Card (Image 2: Maroon card peeking at bottom) */
+/* Lyrics peek card — kept for reference but removed from HTML */
 .fs-lyrics-peek-card {
-  background: #3e1212;
-  border-radius: 18px 18px 0 0;
-  padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 10px));
-  margin: 4px -20px 0;
-  cursor: pointer;
-  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
-  user-select: none;
+  display: none;
 }
 
-.fs-lyrics-peek-card:active {
-  background: #4a1515;
-}
-
-.fs-lyrics-peek-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.fs-lyrics-peek-title {
-  font-size: 14.5px;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.01em;
-}
-
-.fs-lyrics-peek-body {
-  overflow: hidden;
-  max-height: 48px;
-}
-
-.fs-lyrics-peek-text {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  line-height: 1.45;
-  margin: 0;
-}
-
-.fs-lyrics-peek-text .highlight {
-  color: #ffffff;
-  font-weight: 700;
+.fs-lyrics-peek-card:active,
+.fs-lyrics-peek-header,
+.fs-lyrics-peek-title,
+.fs-lyrics-peek-body,
+.fs-lyrics-peek-text,
+.fs-lyrics-peek-text .highlight,
+.fs-floating-lyrics,
+.fs-floating-text {
+  display: none;
 }
 
 /* ==========================================================================
@@ -4629,32 +4965,33 @@ body.locked .spotkify-login-gate {
 }
 
 .login-logo-glow {
-  width: 56px;
-  height: 56px;
+  width: 68px;
+  height: 68px;
   margin-bottom: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 0 16px rgba(0, 245, 160, 0.5));
+  filter: drop-shadow(0 0 16px rgba(0, 229, 255, 0.6));
   animation: logoPulse 3s infinite alternate ease-in-out;
 }
 
 @keyframes logoPulse {
-  0% { transform: scale(1); filter: drop-shadow(0 0 12px rgba(0, 245, 160, 0.4)); }
-  100% { transform: scale(1.05); filter: drop-shadow(0 0 22px rgba(0, 245, 160, 0.7)); }
+  0% { transform: scale(1); filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.45)); }
+  100% { transform: scale(1.05); filter: drop-shadow(0 0 24px rgba(0, 229, 255, 0.85)); }
 }
 
 .login-logo-img {
   width: 100%;
   height: 100%;
   border-radius: 14px;
+  object-fit: cover;
 }
 
 .login-brand-heading {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.8px;
-  background: linear-gradient(135deg, #ffffff 30%, #00f5a0 100%);
+  background: linear-gradient(135deg, #ffffff 30%, #00e5ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 4px;

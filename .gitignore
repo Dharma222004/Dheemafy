@@ -10,7 +10,8 @@ test.env
 *.env
 
 # Database local storage & WAL
-data/*.db
+# Include the seed database so Vercel cold-start has songs (/tmp copy in database.js)
+!data/navidrome.db
 data/*.db-shm
 data/*.db-wal
 data/cache/
