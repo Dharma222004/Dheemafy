@@ -2021,13 +2021,123 @@
 
   // Central Authoritative Play Function
   // Always reads from activePlaybackPlaylist — the engine's queue.
+  // Internal: resolve song index with guard
+  function _doPlayTrack(song, index, directStreamUrl) {
+    const trackLabel = `"${song.title}" [${index + 1}/${activePlaybackPlaylist.length}] id=${song.id}`;
+    console.log(`[Player] ▶ PLAY: ${trackLabel}`);
+    console.log(`[Player]   URL: ${directStreamUrl}`);
+    console.log(`[Player]   audio.src BEFORE: ${audio.src ? audio.src.substring(0, 80) : 'empty'}`);
+    console.log(`[Player]   audio.readyState BEFORE: ${audio.readyState}`);
+    console.log(`[Player]   audio.networkState BEFORE: ${audio.networkState}`);
+    console.log(`[Player]   audio.error BEFORE: ${audio.error ? audio.error.code : 'none'}`);
+    console.log(`[Player]   _isTransitioning: ${_isTransitioning}, isPlaying: ${isPlaying}`);
+
+    // KEY FIX 1: Always set src and call load() before play().
+    // On mobile WebKit/Chrome, omitting audio.load() after src change
+    // causes play() to fail silently on the 3rd+ track because the audio
+    // element is stuck in NETWORK_LOADING state from the previous stream abort.
+    _lastSrcChangedAt = Date.now();
+    audio.src = directStreamUrl;
+    audio.dataset.currentSongId = song.id;
+    audio.load(); // ← CRITICAL: resets decoder and network state for new src
+    _lastTimeUpdateAt = Date.now();
+
+    console.log(`[Player]   audio.src AFTER load(): ${audio.src ? audio.src.substring(0, 80) : 'empty'}`);
+
+    // Update MediaSession for lock screen immediately
+    updateMediaSession(song);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
+
+    // KEY FIX 2: Trigger play(). If AbortError (browser aborted prior stream),
+    // keep _isTransitioning=true through the retry so watchdog cannot interfere.
+    function _attemptPlay(retryCount) {
+      if (currentSong && currentSong.id !== song.id) {
+        // Another track was requested before we could play — bail cleanly
+        console.log(`[Player] ✗ Aborted stale play for ${trackLabel} (superseded)`);
+        _isTransitioning = false;
+        return;
+      }
+
+      console.log(`[Player]   audio.play() attempt #${retryCount + 1} for ${trackLabel}`);
+      const p = audio.play();
+      if (p === undefined) {
+        // Older browser — synchronous
+        _isTransitioning = false;
+        setPlayingState(true);
+        console.log(`[Player] ✓ Play (sync) confirmed: ${trackLabel}`);
+        return;
+      }
+      p.then(() => {
+        _isTransitioning = false;
+        setPlayingState(true);
+        console.log(`[Player] ✓ Play promise resolved: ${trackLabel}`);
+      }).catch(err => {
+        console.warn(`[Player] ✗ Play error for ${trackLabel}: [${err.name}] ${err.message}`);
+        console.warn(`[Player]   audio.readyState: ${audio.readyState}, audio.networkState: ${audio.networkState}, audio.error: ${audio.error ? audio.error.code : 'none'}`);
+
+        if (err.name === 'AbortError') {
+          // AbortError: The browser aborted the previous src load when we changed src.
+          // This is NORMAL. Keep _isTransitioning=true and retry after the browser
+          // has settled. This is the key fix for the Song 3 deterministic failure.
+          console.log(`[Player]   AbortError — retrying in 300ms (retry #${retryCount + 1}, _isTransitioning stays true)`);
+          if (retryCount < 3) {
+            setTimeout(() => _attemptPlay(retryCount + 1), 300);
+          } else {
+            console.error(`[Player]   AbortError: exhausted retries for ${trackLabel}`);
+            _isTransitioning = false;
+            setPlayingState(false);
+          }
+        } else if (err.name === 'NotAllowedError') {
+          // Mobile browser requires user gesture. The audio session was interrupted.
+          console.warn(`[Player]   NotAllowedError — user gesture required for ${trackLabel}`);
+          _isTransitioning = false;
+          // Keep isPlaying=true visually so user knows audio WANTS to play
+          // but the OS paused it (lock screen, call, etc.)
+          setPlayingState(true); // optimistic — MediaSession will reflect real state
+          if (!document.hidden) {
+            showToast('Tap play to resume audio');
+          }
+        } else if (err.name === 'NotSupportedError') {
+          // Codec or URL error — try loading again once
+          console.warn(`[Player]   NotSupportedError — re-loading src for ${trackLabel}`);
+          if (retryCount < 1) {
+            audio.load();
+            setTimeout(() => _attemptPlay(retryCount + 1), 500);
+          } else {
+            _isTransitioning = false;
+            setPlayingState(false);
+          }
+        } else {
+          _isTransitioning = false;
+          setPlayingState(false);
+        }
+      });
+    }
+
+    try {
+      _attemptPlay(0);
+    } catch (err) {
+      _isTransitioning = false;
+      console.error('[Player] Audio play exception:', err);
+      setPlayingState(false);
+    }
+  }
+
   function playTrackAtIndex(index) {
-    if (index < 0 || index >= activePlaybackPlaylist.length) return;
+    console.log(`[Player] playTrackAtIndex(${index}) called — queue length: ${activePlaybackPlaylist.length}, currentTrackIndex was: ${currentTrackIndex}`);
+
+    if (index < 0 || index >= activePlaybackPlaylist.length) {
+      console.error(`[Player] ✗ Index ${index} out of bounds (queue: ${activePlaybackPlaylist.length})`);
+      return;
+    }
 
     _isTransitioning = true;
     currentTrackIndex = index;
     const song = activePlaybackPlaylist[index];
     if (!song) {
+      console.error(`[Player] ✗ No song at index ${index}`);
       _isTransitioning = false;
       return;
     }
@@ -2035,81 +2145,27 @@
 
     const directStreamUrl = song.audio_url || song.audioUrl;
     if (!directStreamUrl) {
-      console.error('[Player] No direct stream URL for track:', song.title);
+      console.error('[Player] ✗ No audio URL for track:', song.title, song);
       _isTransitioning = false;
       return;
     }
 
-    console.log(`[Player] Playing: "${song.title}" (${index + 1}/${activePlaybackPlaylist.length})`);
-
-    // 1. Assign direct Cloudinary stream URL synchronously.
-    // Record the timestamp BEFORE changing src so the pause listener can
-    // distinguish genuine user-pauses from browser-generated pause events
-    // that fire when we swap the audio source during an auto-advance transition.
-    audio.dataset.currentSongId = song.id;
-    if (audio.src !== directStreamUrl) {
-      _lastSrcChangedAt = Date.now();
-      audio.src = directStreamUrl;
-    }
-    _lastTimeUpdateAt = Date.now();
-
-    // 2. Synchronously update MediaSession for lock screen
-    updateMediaSession(song);
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = 'playing';
-    }
-
-    // 3. Trigger play() to preserve audio session in background / lockscreen
-    try {
-      const p = audio.play();
-      if (p !== undefined) {
-        p.then(() => {
-          _isTransitioning = false;
-          setPlayingState(true);
-          console.log(`[Player] Active stream confirmed: "${song.title}"`);
-        }).catch(err => {
-          _isTransitioning = false;
-          console.warn(`[Player] Play note for "${song.title}":`, err.name, err.message);
-          if (err.name === 'AbortError') {
-            setTimeout(() => {
-              if (currentSong && currentSong.id === song.id && audio.paused) {
-                audio.play().then(() => {
-                  setPlayingState(true);
-                }).catch(() => {});
-              }
-            }, 200);
-          } else if (err.name === 'NotAllowedError') {
-            if (!document.hidden) {
-              showToast('Tap play to start audio');
-            }
-            setPlayingState(false);
-          } else {
-            setPlayingState(false);
-          }
-        });
-      } else {
-        _isTransitioning = false;
-        setPlayingState(true);
-      }
-    } catch (err) {
-      _isTransitioning = false;
-      console.error('[Player] Audio play exception:', err);
-      setPlayingState(false);
-    }
-
-    // 4. Update UI safely
+    // Update UI first (non-blocking)
     try {
       updateAllPlayerUI(song);
     } catch (uiErr) {
       console.warn('[Player] UI update warning:', uiErr);
     }
 
-    // 5. Pre-warm next tracks asynchronously
+    // Pre-warm next tracks
     if (audioPreloader && audioPreloader.preloadUpcoming) {
       audioPreloader.preloadUpcoming(currentTrackIndex, activePlaybackPlaylist, 5);
     }
 
-    // 6. Record analytics asynchronously (non-blocking)
+    // Start playback (with load + play)
+    _doPlayTrack(song, index, directStreamUrl);
+
+    // Record analytics (non-blocking, fire-and-forget)
     try {
       fetch('/api/playback/record', {
         method: 'POST',
@@ -2354,7 +2410,8 @@
     setLoadingState(false);
   });
   audio.addEventListener('pause', () => {
-    console.log('[Player] Audio event: pause (ended=' + audio.ended + ', transitioning=' + _isTransitioning + ', srcAge=' + (Date.now() - _lastSrcChangedAt) + 'ms)');
+    const srcAgeMs = Date.now() - _lastSrcChangedAt;
+    console.log(`[Player] Audio event: pause — ended=${audio.ended}, transitioning=${_isTransitioning}, srcAge=${srcAgeMs}ms, currentTime=${audio.currentTime.toFixed(2)}`);
 
     // GUARD 1: Song just finished naturally — browser fires pause right after ended.
     if (audio.ended) {
@@ -2362,23 +2419,22 @@
       return;
     }
 
-    // GUARD 2: We are actively transitioning between tracks.
+    // GUARD 2: We are actively transitioning between tracks (load+play in progress).
     if (_isTransitioning) {
       console.log('[Player] Pause suppressed — track transition in progress.');
       return;
     }
 
-    // GUARD 3: The audio src was just changed (within 2 seconds).
-    // Mobile browsers fire a spurious 'pause' event when src changes, even
-    // though we immediately call play() afterwards. If we don't guard this,
-    // the isPlaying flag gets set to false and the UI shows a stopped player
-    // even though the next song is actively loading/playing.
-    if (Date.now() - _lastSrcChangedAt < 2000) {
-      console.log('[Player] Pause suppressed — src changed recently (mobile track transition).');
+    // GUARD 3: Src was just changed — mobile browsers fire a spurious pause when
+    // audio.src changes and audio.load() is called. Window is 800ms (tightened
+    // from 2000ms) because audio.load() + canplay fires within ~100-200ms on mobile.
+    if (srcAgeMs < 800) {
+      console.log(`[Player] Pause suppressed — src changed ${srcAgeMs}ms ago (mobile load transient).`);
       return;
     }
 
     // Genuine user pause or OS-forced pause — update state.
+    console.log('[Player] Genuine pause detected — setting isPlaying=false');
     if (audio.paused) {
       setPlayingState(false);
     }
@@ -2470,11 +2526,17 @@
   function handleSongEnded() {
     const now = Date.now();
     const songTitle = currentSong ? currentSong.title : 'Unknown track';
-    console.log(`[Player] Song completed: "${songTitle}". Advancing to next track...`);
+    const songId = currentSong ? currentSong.id : 'unknown';
+    console.log(`[Player] ═══ SONG ENDED: "${songTitle}" (id=${songId}) ═══`);
+    console.log(`[Player]   currentTrackIndex: ${currentTrackIndex}, queueLength: ${activePlaybackPlaylist.length}`);
+    console.log(`[Player]   audio.currentTime: ${audio.currentTime.toFixed(2)}, audio.duration: ${isNaN(audio.duration) ? 'NaN' : audio.duration.toFixed(2)}`);
+    console.log(`[Player]   audio.ended: ${audio.ended}, audio.paused: ${audio.paused}`);
+    console.log(`[Player]   repeatMode: ${repeatMode}, isShuffle: ${isShuffle}`);
+    console.log(`[Player]   timeSinceLastEnded: ${now - _lastEndedTimestamp}ms`);
 
     // Debounce rapid duplicate ended events within 800ms
     if ((now - _lastEndedTimestamp) < 800) {
-      console.warn('[Player] Debounced duplicate ended event for:', songTitle);
+      console.warn(`[Player]   DEBOUNCED — duplicate ended event (${now - _lastEndedTimestamp}ms after last). Ignoring.`);
       return;
     }
     _lastEndedTimestamp = now;
@@ -2484,11 +2546,13 @@
 
     // 3-state repeat
     if (repeatMode === 'one') {
-      console.log(`[Player] Repeat One: replaying "${songTitle}"`);
+      console.log(`[Player]   Repeat One: replaying "${songTitle}"`);
       audio.currentTime = 0;
       audio.play().catch(err => console.warn('[Player] Repeat play error:', err));
     } else {
-      console.log('[Player] Advancing automatically to next song in queue');
+      const nextIdx = (currentTrackIndex + 1) % activePlaybackPlaylist.length;
+      const nextSong = activePlaybackPlaylist[nextIdx];
+      console.log(`[Player]   Auto-advance → nextIdx=${nextIdx}, nextSong="${nextSong ? nextSong.title : 'NONE'}", nextUrl=${nextSong ? (nextSong.audio_url || nextSong.audioUrl || 'MISSING').substring(0, 60) : 'N/A'}`);
       playNextTrack(true);
     }
   }
