@@ -1884,6 +1884,9 @@
   let _isTransitioning = false;
   let _lastEndedTrackId = null;
   let _lastEndedTimestamp = 0;
+  // Timestamp of the last audio.src change — used to suppress spurious 'pause' events
+  // that mobile browsers fire when the src is swapped during an auto-advance transition.
+  let _lastSrcChangedAt = 0;
 
   function updateAllPlayerUI(song) {
     if (!song) return;
@@ -2039,9 +2042,13 @@
 
     console.log(`[Player] Playing: "${song.title}" (${index + 1}/${activePlaybackPlaylist.length})`);
 
-    // 1. Assign direct Cloudinary stream URL synchronously
+    // 1. Assign direct Cloudinary stream URL synchronously.
+    // Record the timestamp BEFORE changing src so the pause listener can
+    // distinguish genuine user-pauses from browser-generated pause events
+    // that fire when we swap the audio source during an auto-advance transition.
     audio.dataset.currentSongId = song.id;
     if (audio.src !== directStreamUrl) {
+      _lastSrcChangedAt = Date.now();
       audio.src = directStreamUrl;
     }
     _lastTimeUpdateAt = Date.now();
@@ -2347,14 +2354,31 @@
     setLoadingState(false);
   });
   audio.addEventListener('pause', () => {
-    console.log('[Player] Audio event: pause');
-    // When a song naturally finishes, the browser fires pause.
-    // Do NOT set playingState to false if the song just ended or is advancing!
+    console.log('[Player] Audio event: pause (ended=' + audio.ended + ', transitioning=' + _isTransitioning + ', srcAge=' + (Date.now() - _lastSrcChangedAt) + 'ms)');
+
+    // GUARD 1: Song just finished naturally — browser fires pause right after ended.
     if (audio.ended) {
-      console.log('[Player] Track ended; keeping playing state active for next track transition.');
+      console.log('[Player] Pause suppressed — track ended (auto-advance in progress).');
       return;
     }
-    if (_isTransitioning) return;
+
+    // GUARD 2: We are actively transitioning between tracks.
+    if (_isTransitioning) {
+      console.log('[Player] Pause suppressed — track transition in progress.');
+      return;
+    }
+
+    // GUARD 3: The audio src was just changed (within 2 seconds).
+    // Mobile browsers fire a spurious 'pause' event when src changes, even
+    // though we immediately call play() afterwards. If we don't guard this,
+    // the isPlaying flag gets set to false and the UI shows a stopped player
+    // even though the next song is actively loading/playing.
+    if (Date.now() - _lastSrcChangedAt < 2000) {
+      console.log('[Player] Pause suppressed — src changed recently (mobile track transition).');
+      return;
+    }
+
+    // Genuine user pause or OS-forced pause — update state.
     if (audio.paused) {
       setPlayingState(false);
     }
