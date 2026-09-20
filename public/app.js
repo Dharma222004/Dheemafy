@@ -22,10 +22,10 @@
   let isShuffle = false;
 
   // repeatMode: 'off' | 'all' | 'one'
-  // 'off' → stop at end of playlist
-  // 'all' → loop the entire playlist
+  // 'off' → stop at end of playlist (or fallback to Autoplay radio)
+  // 'all' → loop the playlist continuously (default for uninterrupted mobile listening)
   // 'one' → replay the current song
-  let repeatMode = 'off';
+  let repeatMode = 'all';
 
   let currentRoute = 'home';
   let queue = [];
@@ -58,6 +58,30 @@
   const audio = document.getElementById('spotifyAudioEngine');
   if (audio) {
     audio.preload = 'auto';
+  }
+
+  // ==========================================================================
+  // SCREEN WAKE LOCK ENGINE
+  // Keeps mobile screen & CPU active while music is playing, preventing the OS
+  // from suspending JavaScript execution or halting track transitions after 2 songs.
+  // ==========================================================================
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator && !wakeLock && !document.hidden && isPlaying) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+        console.log('[Player] Screen wake lock active (screen will not sleep during playback)');
+      }
+    } catch (_) {}
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) {
+      try { wakeLock.release(); } catch (_) {}
+      wakeLock = null;
+      console.log('[Player] Screen wake lock released');
+    }
   }
 
   // ==========================================================================
@@ -2015,10 +2039,14 @@
 
     console.log(`[Player] Playing: "${song.title}" (${index + 1}/${activePlaybackPlaylist.length})`);
 
-    // 1. Assign direct Cloudinary stream URL synchronously
+    // 1. Assign direct Cloudinary stream URL synchronously & prime decoder
     audio.dataset.currentSongId = song.id;
     if (audio.src !== directStreamUrl) {
       audio.src = directStreamUrl;
+      try {
+        // Explicitly reload media element on mobile browsers (Safari iOS / Android Chrome)
+        audio.load();
+      } catch (_) { }
     }
 
     // 2. Synchronously update MediaSession for lock screen
@@ -2038,13 +2066,21 @@
         }).catch(err => {
           _isTransitioning = false;
           console.warn(`[Player] Play note for "${song.title}":`, err.name, err.message);
-          if (err.name === 'NotAllowedError') {
+          if (err.name === 'AbortError') {
+            console.log('[Player] Play request interrupted by mobile pipeline reset. Retrying in 250ms...');
+            setTimeout(() => {
+              if (currentSong && currentSong.id === song.id && audio.paused) {
+                audio.play().then(() => {
+                  _isTransitioning = false;
+                  setPlayingState(true);
+                }).catch(() => {});
+              }
+            }, 250);
+          } else if (err.name === 'NotAllowedError') {
             if (!document.hidden) {
               showToast('Tap play to start audio');
             }
             setPlayingState(false);
-          } else if (err.name === 'AbortError') {
-            console.log('[Player] Play request interrupted by subsequent track transition');
           } else {
             setPlayingState(false);
           }
@@ -2091,6 +2127,13 @@
     if (mobileBarPauseSvg) mobileBarPauseSvg.classList.toggle('hidden', !playing);
     if (fsPlaySvg) fsPlaySvg.classList.toggle('hidden', playing);
     if (fsPauseSvg) fsPauseSvg.classList.toggle('hidden', !playing);
+
+    // Keep mobile screen alive while playing, release when paused
+    if (playing) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
 
     // Sync lockscreen / Bluetooth playback state
     updateMediaSessionPlaybackState();
@@ -2205,7 +2248,7 @@
 
     let nextIdx;
     if (isShuffle) {
-      // FIX-3: Use version-based identity guard instead of fragile length comparison
+      // Version-based identity guard
       if (shuffleQueueVersion !== shufflePlaylistVersion) {
         shuffleQueue = generateShuffleOrder(activePlaybackPlaylist.length, currentTrackIndex >= 0 ? currentTrackIndex : 0);
         shuffleQueueVersion = shufflePlaylistVersion;
@@ -2213,31 +2256,39 @@
       }
       shuffleIndex++;
       if (shuffleIndex >= shuffleQueue.length) {
-        // FIX-1: 3-state repeat
-        if (repeatMode === 'all') {
-          shuffleIndex = 0;
+        if (repeatMode === 'one') {
+          nextIdx = currentTrackIndex;
         } else {
-          // 'off' or 'one' (one is handled by handleSongEnded, shouldn't reach here in shuffle)
-          if (audio) audio.pause();
-          setPlayingState(false);
-          return;
+          // Continuous Shuffle: Loop back or re-shuffle so music never shuts off
+          shuffleQueue = generateShuffleOrder(activePlaybackPlaylist.length, currentTrackIndex >= 0 ? currentTrackIndex : 0);
+          shuffleIndex = 0;
+          nextIdx = shuffleQueue[0];
+          console.log('[Player] Shuffle queue finished. Looping continuously with new shuffle order.');
         }
+      } else {
+        nextIdx = shuffleQueue[shuffleIndex];
       }
-      nextIdx = shuffleQueue[shuffleIndex];
     } else {
       const isAtEnd = currentTrackIndex + 1 >= activePlaybackPlaylist.length;
       if (isAtEnd && isAutoAdvance) {
-        // FIX-1: 3-state repeat determines end-of-playlist behavior
-        if (repeatMode === 'all') {
-          nextIdx = 0; // wrap around
-        } else if (repeatMode === 'one') {
-          nextIdx = currentTrackIndex; // stay (also handled by handleSongEnded)
+        if (repeatMode === 'one') {
+          nextIdx = currentTrackIndex; // stay on current song
+        } else if (repeatMode === 'all' || activePlaybackPlaylist.length <= 5) {
+          // Repeat All or small playlist: seamlessly loop back to track 1
+          nextIdx = 0;
+          console.log('[Player] End of playlist reached. Looping continuously from track 1.');
         } else {
-          // 'off': stop
-          if (audio) audio.pause();
-          setPlayingState(false);
-          console.log('[Player] End of playlist reached. Repeat is OFF — stopping.');
-          return;
+          // Autoplay Continuous Radio: append unplayed songs from library so music NEVER dies
+          const candidateSongs = (allSongs && allSongs.length > 0) ? allSongs : activePlaybackPlaylist;
+          const unplayed = candidateSongs.filter(s => !activePlaybackPlaylist.some(q => q.id === s.id));
+          if (unplayed.length > 0) {
+            const nextAuto = unplayed[Math.floor(Math.random() * unplayed.length)];
+            activePlaybackPlaylist.push(nextAuto);
+            nextIdx = activePlaybackPlaylist.length - 1;
+            console.log(`[Player] Autoplay continuous radio: Queued "${nextAuto.title}" from library.`);
+          } else {
+            nextIdx = 0; // wrap around
+          }
         }
       } else {
         nextIdx = (currentTrackIndex + 1) % activePlaybackPlaylist.length;
@@ -2317,8 +2368,9 @@
     if (currentSong && !document.hidden) {
       showToast(`⚠ Could not play "${currentSong.title}". Skipping...`);
     }
-    // Auto-advance to next song after short delay if queue has tracks
-    if (currentPlaylist.length > 1) {
+    // Auto-advance to next song after short delay if queue or library has tracks
+    const availableCount = (activePlaybackPlaylist && activePlaybackPlaylist.length) || (allSongs && allSongs.length) || 0;
+    if (availableCount > 1) {
       setTimeout(() => playNextTrack(true), 1500);
     }
   });
@@ -2360,6 +2412,15 @@
       }
       if (fsProgressFill) fsProgressFill.style.width = `${pct}%`;
       if (fsProgressThumb) fsProgressThumb.style.left = `${pct}%`;
+
+      // Near-End Auto-Advance Guard for Mobile Streaming:
+      // Mobile Safari and Android Chrome occasionally fail to fire the native 'ended' event
+      // if the audio stream reaches the final buffer frame in background/locked state.
+      if (current >= (total - 0.35) && !_isTransitioning && isPlaying && !audio.paused) {
+        console.log(`[Player] Near-end boundary reached (${current.toFixed(1)}s / ${total.toFixed(1)}s). Triggering seamless advance.`);
+        handleSongEnded();
+        return;
+      }
     }
     const now = Date.now();
     if (now - _lastMsUpdate > 1000) {
@@ -2404,6 +2465,18 @@
   // it means the network stalled or the decoder hung. Attempt recovery by re-seeking.
   setInterval(() => {
     if (!isPlaying || audio.paused || isSeeking || _isTransitioning) return;
+    const current = audio.currentTime || 0;
+    const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
+      ? audio.duration
+      : (currentSong && currentSong.duration ? currentSong.duration : 0);
+
+    // If stalled right at the end of the track, trigger song ended
+    if (total > 0 && current >= (total - 1.5)) {
+      console.warn('[Player] Track stalled at end of stream. Forcing auto-advance...');
+      handleSongEnded();
+      return;
+    }
+
     if (audio.readyState >= 3) return; // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA — all good
     const stallDuration = Date.now() - _lastTimeUpdateAt;
     if (_lastTimeUpdateAt > 0 && stallDuration > 8000) {
@@ -2668,6 +2741,8 @@
     const messages = { off: 'Repeat is OFF', all: 'Repeat All is ON', one: 'Repeat One is ON' };
     showToast(messages[repeatMode]);
   });
+  // Initialize Repeat UI state (default: 'all')
+  updateRepeatUI();
 
   btnBigPlay.addEventListener('click', () => {
     // FIX-2: Big Play commits the browsing playlist to the active playback queue
@@ -3158,6 +3233,7 @@
 
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
+      releaseWakeLock();
       console.log('[Player] Page hidden / screen locked — keeping audio active');
       // Ensure MediaSession is up-to-date so lock screen shows correct song
       if (currentSong) {
@@ -3168,6 +3244,23 @@
 
     // Screen unlocked / page visible again: Synchronize UI with actual playback state
     console.log('[Player] Page visible / screen unlocked — synchronizing UI');
+    if (isPlaying) {
+      requestWakeLock();
+      // If audio paused while screen was off/locked, auto-resume or advance if at end
+      if (audio && audio.paused) {
+        const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
+          ? audio.duration
+          : (currentSong && currentSong.duration ? currentSong.duration : 0);
+        if (total > 0 && audio.currentTime >= (total - 1.5)) {
+          console.log('[Player] Track ended while phone was locked. Advancing to next track...');
+          playNextTrack(true);
+        } else {
+          console.log('[Player] Resuming playback after phone screen unlock...');
+          audio.play().then(() => setPlayingState(true)).catch(() => {});
+        }
+      }
+    }
+
     if (currentSong) {
       try {
         updateAllPlayerUI(currentSong);
