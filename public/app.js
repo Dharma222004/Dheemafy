@@ -2560,46 +2560,89 @@
   audio.addEventListener('ended', handleSongEnded);
 
   // Network stall watchdog:
-  // If audio is supposed to be playing but timeupdate hasn't fired for 8+ seconds,
-  // attempt recovery by re-seeking.
+  // Runs every 2s. If audio is supposed to be playing but is stalled mid-song,
+  // attempt recovery. Also handles end-of-stream detection as a fallback.
   setInterval(() => {
-    if (!isPlaying || audio.paused || isSeeking || _isTransitioning) return;
+    if (!isPlaying || isSeeking || _isTransitioning) return;
+
     const current = audio.currentTime || 0;
     const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
       ? audio.duration
       : (currentSong && currentSong.duration ? currentSong.duration : 0);
 
-    // Only force auto-advance if the song has genuinely played (> 15s) and is within 1.5s of total
-    if (total > 20 && current > 15 && current >= (total - 1.5)) {
-      console.warn('[Player] Track stalled at genuine end of stream. Forcing auto-advance...');
+    // END-OF-STREAM FALLBACK: Force auto-advance if stream genuinely ended but
+    // 'ended' event was not fired (happens on some mobile browsers).
+    if (total > 20 && current > 15 && current >= (total - 1.5) && audio.paused) {
+      console.warn(`[Player] Watchdog: stream ended without 'ended' event. Forcing auto-advance (current=${current.toFixed(1)}, total=${total.toFixed(1)})`);
       handleSongEnded();
       return;
     }
 
-    if (audio.readyState >= 3) return; // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA — all good
+    // MID-SONG STALL RECOVERY: Detect if audio is supposed to be playing but
+    // has stalled mid-stream (e.g. mobile network drop, CPU throttle).
+    if (audio.paused) {
+      // Audio paused while isPlaying=true — this is an OS-forced pause
+      // (phone call, headset disconnect, OS media focus lost, etc.)
+      // Try to resume.
+      const stallAge = Date.now() - _lastSrcChangedAt;
+      if (stallAge > 2000) { // don't interfere with load transitions
+        console.warn(`[Player] Watchdog: audio paused mid-song while isPlaying=true. Attempting resume...`);
+        _isTransitioning = true;
+        audio.play().then(() => {
+          _isTransitioning = false;
+          setPlayingState(true);
+          console.log('[Player] Watchdog: mid-song resume succeeded.');
+        }).catch(err => {
+          _isTransitioning = false;
+          console.warn('[Player] Watchdog: mid-song resume failed:', err.name);
+          if (err.name !== 'NotAllowedError') {
+            setPlayingState(false);
+          }
+          // NotAllowedError = OS blocked it (phone call, etc.) — keep isPlaying=true visually
+        });
+      }
+      return;
+    }
+
+    // NETWORK STALL: audio is NOT paused but timeupdate stopped firing (network buffer empty)
+    if (audio.readyState >= 3) return; // HAVE_FUTURE_DATA — all good
     const stallDuration = Date.now() - _lastTimeUpdateAt;
     if (_lastTimeUpdateAt > 0 && stallDuration > 8000) {
-      console.warn('[Player] Stall detected! readyState=' + audio.readyState + ', stalled for ' + Math.round(stallDuration / 1000) + 's. Attempting recovery...');
+      console.warn(`[Player] Watchdog: network stall detected! readyState=${audio.readyState}, stalled for ${Math.round(stallDuration / 1000)}s. Re-seeking to resume buffering...`);
       try {
         const currentTime = audio.currentTime;
-        audio.currentTime = currentTime; // Re-seek to same position to kick the decoder
+        audio.currentTime = currentTime; // Re-seek kicks the buffer/decoder
         audio.play().catch(() => {});
+        _lastTimeUpdateAt = Date.now(); // Reset so we don't re-trigger immediately
       } catch (e) {}
     }
   }, 2000);
 
-  // FIX-8: Loading / buffering state management.
-  // Shows a 'loading' CSS class on the play buttons during network stalls so users
-  // know the player is working, not frozen.
+  // Loading / buffering state management.
+  // Shows a 'loading' CSS class on play buttons during network stalls.
   function setLoadingState(loading) {
     if (barBtnPlayPause) barBtnPlayPause.classList.toggle('loading', loading);
     if (fsBtnPlayPause) fsBtnPlayPause.classList.toggle('loading', loading);
   }
-  audio.addEventListener('loadstart', () => setLoadingState(true));
-  audio.addEventListener('waiting', () => setLoadingState(true));
-  audio.addEventListener('stalled', () => setLoadingState(true));
-  audio.addEventListener('canplay', () => setLoadingState(false));
+  audio.addEventListener('loadstart', () => { console.log('[Player] Audio: loadstart'); setLoadingState(true); });
+  audio.addEventListener('canplay', () => { console.log('[Player] Audio: canplay \u2014 ready to play'); setLoadingState(false); });
   audio.addEventListener('canplaythrough', () => setLoadingState(false));
+
+  // MID-SONG STALL DIAGNOSTICS: log when audio buffer stalls or network errors occur
+
+  audio.addEventListener('stalled', () => {
+    console.warn(`[Player] Audio stalled — readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime.toFixed(2)}`);
+    setLoadingState(true);
+  });
+  audio.addEventListener('waiting', () => {
+    console.warn(`[Player] Audio waiting (buffering) — readyState=${audio.readyState}, currentTime=${audio.currentTime.toFixed(2)}`);
+    setLoadingState(true);
+  });
+  audio.addEventListener('suspend', () => {
+    if (isPlaying && !_isTransitioning) {
+      console.warn(`[Player] Audio suspended by browser — readyState=${audio.readyState}, networkState=${audio.networkState}`);
+    }
+  });
 
   // Seekbar Click & Drag
   function handleSeek(e) {
