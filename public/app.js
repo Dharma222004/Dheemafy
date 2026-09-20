@@ -2044,9 +2044,6 @@
     if (audio.src !== directStreamUrl) {
       audio.src = directStreamUrl;
     }
-    try {
-      audio.currentTime = 0;
-    } catch (_) { }
     _lastTimeUpdateAt = Date.now();
 
     // 2. Synchronously update MediaSession for lock screen
@@ -2060,22 +2057,20 @@
       const p = audio.play();
       if (p !== undefined) {
         p.then(() => {
-          // Keep _isTransitioning true for a brief 300ms window so decoder stabilizes at 0s
-          setTimeout(() => { _isTransitioning = false; }, 300);
+          _isTransitioning = false;
           setPlayingState(true);
           console.log(`[Player] Active stream confirmed: "${song.title}"`);
         }).catch(err => {
           _isTransitioning = false;
           console.warn(`[Player] Play note for "${song.title}":`, err.name, err.message);
           if (err.name === 'AbortError') {
-            console.log('[Player] Play request interrupted by mobile pipeline reset. Retrying in 250ms...');
             setTimeout(() => {
               if (currentSong && currentSong.id === song.id && audio.paused) {
                 audio.play().then(() => {
                   setPlayingState(true);
                 }).catch(() => {});
               }
-            }, 250);
+            }, 200);
           } else if (err.name === 'NotAllowedError') {
             if (!document.hidden) {
               showToast('Tap play to start audio');
@@ -2086,7 +2081,7 @@
           }
         });
       } else {
-        setTimeout(() => { _isTransitioning = false; }, 300);
+        _isTransitioning = false;
         setPlayingState(true);
       }
     } catch (err) {
@@ -2353,7 +2348,12 @@
   });
   audio.addEventListener('pause', () => {
     console.log('[Player] Audio event: pause');
-    // If we are actively transitioning tracks or audio isn't actually paused, ignore
+    // When a song naturally finishes, the browser fires pause.
+    // Do NOT set playingState to false if the song just ended or is advancing!
+    if (audio.ended) {
+      console.log('[Player] Track ended; keeping playing state active for next track transition.');
+      return;
+    }
     if (_isTransitioning) return;
     if (audio.paused) {
       setPlayingState(false);
@@ -2427,11 +2427,10 @@
       if (fsProgressFill) fsProgressFill.style.width = `${pct}%`;
       if (fsProgressThumb) fsProgressThumb.style.left = `${pct}%`;
 
-      // Near-End Auto-Advance Guard for Mobile Streaming:
-      // ONLY trigger if the song has genuinely played for > 15 seconds,
-      // total duration is > 20 seconds, and current is within 0.35 seconds of total
-      if (total > 20 && current > 15 && current >= (total - 0.35) && !_isTransitioning && isPlaying && !audio.paused) {
-        console.log(`[Player] Near-end boundary reached (${current.toFixed(1)}s / ${total.toFixed(1)}s). Seamlessly advancing.`);
+      // Fallback: If audio reached end of stream (within 0.5s of total) and has paused,
+      // but browser somehow missed firing the native 'ended' event:
+      if (total > 10 && current >= (total - 0.5) && audio.paused && isPlaying) {
+        console.log('[Player] Audio stream reached end and paused. Advancing to next track.');
         handleSongEnded();
         return;
       }
@@ -2443,38 +2442,21 @@
     }
   });
 
-  // Dedicated, Guarded Ended Event Handler for Mobile Background Continuous Playback
+  // Dedicated Ended Event Handler for Continuous Playback
   function handleSongEnded() {
     const now = Date.now();
     const songTitle = currentSong ? currentSong.title : 'Unknown track';
-    const current = audio ? (audio.currentTime || 0) : 0;
-    const total = (audio && audio.duration && !isNaN(audio.duration) && audio.duration > 0)
-      ? audio.duration
-      : (currentSong && currentSong.duration ? currentSong.duration : 0);
+    console.log(`[Player] Song completed: "${songTitle}". Advancing to next track...`);
 
-    // Guard 1: Cannot end if we are in the middle of a track transition
-    if (_isTransitioning) {
-      console.warn('[Player] Ignored ended event during active track transition for:', songTitle);
-      return;
-    }
-
-    // Guard 2: Cannot end if less than 8 seconds have played of a song that is longer than 15s
-    if (current < 8 && total > 15) {
-      console.warn('[Player] Ignored false early ended event: track just started (currentTime=' + current.toFixed(1) + 's, total=' + total.toFixed(1) + 's)');
-      return;
-    }
-
-    // Guard 3: Minimum 3 seconds between any consecutive ended transitions
-    if ((now - _lastEndedTimestamp) < 3000) {
-      console.warn('[Player] Ignored duplicate/trailing ended event within 3s window for:', songTitle);
+    // Debounce rapid duplicate ended events within 800ms
+    if ((now - _lastEndedTimestamp) < 800) {
+      console.warn('[Player] Debounced duplicate ended event for:', songTitle);
       return;
     }
     _lastEndedTimestamp = now;
     if (currentSong) {
       _lastEndedTrackId = currentSong.id;
     }
-
-    console.log(`[Player] Song genuinely ended: "${songTitle}" (${current.toFixed(1)}s/${total.toFixed(1)}s)`);
 
     // 3-state repeat
     if (repeatMode === 'one') {
