@@ -2050,12 +2050,18 @@
       navigator.mediaSession.playbackState = 'playing';
     }
 
-    // KEY FIX 2: Trigger play(). If AbortError (browser aborted prior stream),
-    // keep _isTransitioning=true through the retry so watchdog cannot interfere.
+    // BACKGROUND-SAFE PLAY ENGINE
+    // ─────────────────────────────────────────────────────────────────────────
+    // Android Chrome throttles setTimeout to 1-MINUTE intervals in background
+    // tabs. If audio.play() gets AbortError when screen is locked, a 300ms
+    // setTimeout retry fires 60 seconds later (too late — Chrome has frozen
+    // the tab by then). The fix: use 'canplay' event instead of setTimeout.
+    // 'canplay' is a native media event fired by the browser's audio pipeline,
+    // NOT a JS timer — Chrome fires it even in fully throttled background tabs.
+    // ─────────────────────────────────────────────────────────────────────────
     function _attemptPlay(retryCount) {
       if (currentSong && currentSong.id !== song.id) {
-        // Another track was requested before we could play — bail cleanly
-        console.log(`[Player] ✗ Aborted stale play for ${trackLabel} (superseded)`);
+        console.log(`[Player] ✗ Aborted stale play for ${trackLabel} (superseded by another track)`);
         _isTransitioning = false;
         return;
       }
@@ -2063,7 +2069,6 @@
       console.log(`[Player]   audio.play() attempt #${retryCount + 1} for ${trackLabel}`);
       const p = audio.play();
       if (p === undefined) {
-        // Older browser — synchronous
         _isTransitioning = false;
         setPlayingState(true);
         console.log(`[Player] ✓ Play (sync) confirmed: ${trackLabel}`);
@@ -2072,41 +2077,61 @@
       p.then(() => {
         _isTransitioning = false;
         setPlayingState(true);
-        console.log(`[Player] ✓ Play promise resolved: ${trackLabel}`);
+        console.log(`[Player] ✓ Play confirmed: ${trackLabel}`);
       }).catch(err => {
-        console.warn(`[Player] ✗ Play error for ${trackLabel}: [${err.name}] ${err.message}`);
-        console.warn(`[Player]   audio.readyState: ${audio.readyState}, audio.networkState: ${audio.networkState}, audio.error: ${audio.error ? audio.error.code : 'none'}`);
+        console.warn(`[Player] ✗ Play error [${err.name}] for ${trackLabel}: ${err.message}`);
+        console.warn(`[Player]   readyState=${audio.readyState} networkState=${audio.networkState} error=${audio.error ? audio.error.code : 'none'}`);
 
         if (err.name === 'AbortError') {
-          // AbortError: The browser aborted the previous src load when we changed src.
-          // This is NORMAL. Keep _isTransitioning=true and retry after the browser
-          // has settled. This is the key fix for the Song 3 deterministic failure.
-          console.log(`[Player]   AbortError — retrying in 300ms (retry #${retryCount + 1}, _isTransitioning stays true)`);
-          if (retryCount < 3) {
-            setTimeout(() => _attemptPlay(retryCount + 1), 300);
-          } else {
-            console.error(`[Player]   AbortError: exhausted retries for ${trackLabel}`);
+          // AbortError = browser aborted previous load when src changed. Normal.
+          // _isTransitioning stays TRUE so watchdog cannot interfere during retry.
+          if (retryCount >= 4) {
+            console.error(`[Player]   AbortError: all retries exhausted for ${trackLabel}`);
             _isTransitioning = false;
             setPlayingState(false);
+            return;
           }
+
+          console.log(`[Player]   AbortError — waiting for 'canplay' event (background-safe retry #${retryCount + 1})`);
+
+          // PRIMARY RETRY: wait for 'canplay' (native event, fires even with locked screen)
+          let _canplayHandled = false;
+          const _onCanPlay = () => {
+            if (_canplayHandled) return;
+            _canplayHandled = true;
+            console.log(`[Player]   'canplay' fired — retrying play for ${trackLabel}`);
+            _attemptPlay(retryCount + 1);
+          };
+          audio.addEventListener('canplay', _onCanPlay, { once: true });
+
+          // FALLBACK: If canplay doesn't fire (network error, decode error),
+          // use a timer fallback. 2000ms is long enough for even throttled timers.
+          const _fallbackTimer = setTimeout(() => {
+            if (_canplayHandled) return;
+            _canplayHandled = true;
+            audio.removeEventListener('canplay', _onCanPlay);
+            console.log(`[Player]   canplay fallback timer fired — retrying play for ${trackLabel}`);
+            _attemptPlay(retryCount + 1);
+          }, 2000);
+
+          // If canplay fires first, cancel the fallback timer
+          audio.addEventListener('canplay', () => clearTimeout(_fallbackTimer), { once: true });
+
         } else if (err.name === 'NotAllowedError') {
-          // Mobile browser requires user gesture. The audio session was interrupted.
-          console.warn(`[Player]   NotAllowedError — user gesture required for ${trackLabel}`);
+          // OS blocked playback (phone call, screen lock policy, etc.)
+          console.warn(`[Player]   NotAllowedError — OS blocked playback for ${trackLabel}`);
           _isTransitioning = false;
-          // Keep isPlaying=true visually so user knows audio WANTS to play
-          // but the OS paused it (lock screen, call, etc.)
-          setPlayingState(true); // optimistic — MediaSession will reflect real state
-          if (!document.hidden) {
-            showToast('Tap play to resume audio');
-          }
+          setPlayingState(true); // Keep UI as 'playing' — audio will resume when OS allows
+          if (!document.hidden) showToast('Tap play to resume audio');
+
         } else if (err.name === 'NotSupportedError') {
-          // Codec or URL error — try loading again once
-          console.warn(`[Player]   NotSupportedError — re-loading src for ${trackLabel}`);
+          // Codec/URL issue
+          console.warn(`[Player]   NotSupportedError — reloading src for ${trackLabel}`);
+          _isTransitioning = false;
           if (retryCount < 1) {
             audio.load();
-            setTimeout(() => _attemptPlay(retryCount + 1), 500);
+            audio.addEventListener('canplay', () => _attemptPlay(retryCount + 1), { once: true });
           } else {
-            _isTransitioning = false;
             setPlayingState(false);
           }
         } else {
@@ -2120,7 +2145,7 @@
       _attemptPlay(0);
     } catch (err) {
       _isTransitioning = false;
-      console.error('[Player] Audio play exception:', err);
+      console.error('[Player] Audio play() threw exception:', err);
       setPlayingState(false);
     }
   }
@@ -2485,6 +2510,9 @@
     }
   });
 
+  // Pre-buffer tracking: song ID for which we've already triggered preload
+  let _prebufferedForSongId = null;
+
   audio.addEventListener('timeupdate', () => {
     if (isSeeking) return;
     _lastTimeUpdateAt = Date.now();
@@ -2501,16 +2529,42 @@
       const pct = (current / total) * 100;
       progressFillBar.style.width = `${pct}%`;
       progressHandle.style.left = `${pct}%`;
-      if (mobileMiniProgressFill) {
-        mobileMiniProgressFill.style.width = `${pct}%`;
-      }
+      if (mobileMiniProgressFill) mobileMiniProgressFill.style.width = `${pct}%`;
       if (fsProgressFill) fsProgressFill.style.width = `${pct}%`;
       if (fsProgressThumb) fsProgressThumb.style.left = `${pct}%`;
 
-      // Fallback: If audio reached end of stream (within 0.5s of total) and has paused,
-      // but browser somehow missed firing the native 'ended' event:
-      if (total > 10 && current >= (total - 0.5) && audio.paused && isPlaying) {
-        console.log('[Player] Audio stream reached end and paused. Advancing to next track.');
+      // PRE-BUFFER: When within 5 seconds of end, eagerly buffer the next track.
+      // timeupdate is fired by the native audio pipeline, not JS timers, so it
+      // fires reliably even when screen is locked and Chrome has throttled timers.
+      // This ensures the next song is already loaded when 'ended' fires, making
+      // the transition instant (no silence gap that could trigger Chrome throttling).
+      const timeLeft = total - current;
+      if (total > 15 && timeLeft <= 5 && timeLeft > 0 && !_isTransitioning && isPlaying) {
+        const nextIdx = (currentTrackIndex + 1) % activePlaybackPlaylist.length;
+        const nextSong = nextIdx >= 0 ? activePlaybackPlaylist[nextIdx] : null;
+        if (nextSong && _prebufferedForSongId !== nextSong.id) {
+          _prebufferedForSongId = nextSong.id;
+          const nextUrl = nextSong.audio_url || nextSong.audioUrl;
+          if (nextUrl) {
+            console.log(`[Player] Pre-buffering next track (${timeLeft.toFixed(1)}s left): "${nextSong.title}"`);
+            // Use a hidden Audio element to start loading the next track's data.
+            // When 'ended' fires and we set audio.src = nextUrl, the browser
+            // will use the already-buffered data for an instant start.
+            try {
+              if (!window._dheemafyPreloadEl) {
+                window._dheemafyPreloadEl = new Audio();
+                window._dheemafyPreloadEl.preload = 'auto';
+              }
+              window._dheemafyPreloadEl.src = nextUrl;
+              window._dheemafyPreloadEl.load();
+            } catch (_) {}
+          }
+        }
+      }
+
+      // FALLBACK: If audio reached end and paused but 'ended' event didn't fire
+      if (total > 10 && current >= (total - 0.5) && audio.paused && isPlaying && !_isTransitioning) {
+        console.log('[Player] timeupdate fallback: stream ended, advancing to next track.');
         handleSongEnded();
         return;
       }
@@ -3373,40 +3427,81 @@
     } catch (e) { }
   }, 30000);
 
+  // ============================================================================
+  // BACKGROUND PLAYBACK RECOVERY
+  // Handles the scenario where the screen locks, Chrome freezes JS, a song ends
+  // while frozen, and JS resumes when the user opens the browser (or Chrome
+  // decides to unfreeze). We must check whether audio ended while frozen and
+  // advance to the next song immediately.
+  // ============================================================================
+
+  function _recoverPlaybackAfterResume(source) {
+    console.log(`[Player] Recovery check after: ${source}`);
+    console.log(`[Player]   audio.ended=${audio.ended}, audio.paused=${audio.paused}, isPlaying=${isPlaying}, _isTransitioning=${_isTransitioning}`);
+
+    if (!isPlaying || _isTransitioning) return;
+
+    if (audio.ended) {
+      // Song ended while JS was frozen/throttled — advance to next track NOW
+      console.log('[Player]   Song ended while frozen. Advancing to next track...');
+      _lastEndedTimestamp = 0; // reset debounce so handleSongEnded() runs
+      handleSongEnded();
+      return;
+    }
+
+    if (audio.paused) {
+      const current = audio.currentTime || 0;
+      const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
+        ? audio.duration
+        : (currentSong && currentSong.duration ? currentSong.duration : 0);
+
+      if (total > 0 && current >= (total - 2)) {
+        // Near end — treat as ended
+        console.log('[Player]   Audio near end while paused. Advancing...');
+        _lastEndedTimestamp = 0;
+        handleSongEnded();
+      } else {
+        // Mid-song pause — try to resume
+        console.log(`[Player]   Mid-song pause detected (${current.toFixed(1)}/${total.toFixed(1)}s). Resuming...`);
+        audio.play().then(() => {
+          setPlayingState(true);
+          console.log('[Player]   Resumed successfully after unlock.');
+        }).catch(err => {
+          console.warn('[Player]   Resume failed:', err.name);
+          // Try again via playTrackAtIndex (full reload)
+          if (err.name !== 'NotAllowedError' && currentTrackIndex >= 0) {
+            playTrackAtIndex(currentTrackIndex);
+          }
+        });
+      }
+    }
+  }
+
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
       releaseWakeLock();
-      console.log('[Player] Page hidden / screen locked — keeping audio active');
-      // Ensure MediaSession is up-to-date so lock screen shows correct song
+      console.log('[Player] Screen locked / page hidden — audio continues in background');
       if (currentSong) {
         try { updateMediaSession(currentSong); } catch (_) {}
+        // Keep MediaSession in 'playing' state so OS knows we're an active audio source
+        if ('mediaSession' in navigator && isPlaying) {
+          navigator.mediaSession.playbackState = 'playing';
+        }
       }
       return;
     }
 
-    // Screen unlocked / page visible again: Synchronize UI with actual playback state
-    console.log('[Player] Page visible / screen unlocked — synchronizing UI');
+    // Screen unlocked or browser brought to foreground
+    console.log('[Player] Screen unlocked / page visible — recovering playback state');
     if (isPlaying) {
       requestWakeLock();
-      // If audio paused while screen was off/locked, auto-resume or advance if at end
-      if (audio && audio.paused) {
-        const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
-          ? audio.duration
-          : (currentSong && currentSong.duration ? currentSong.duration : 0);
-        if (total > 0 && audio.currentTime >= (total - 1.5)) {
-          console.log('[Player] Track ended while phone was locked. Advancing to next track...');
-          playNextTrack(true);
-        } else {
-          console.log('[Player] Resuming playback after phone screen unlock...');
-          audio.play().then(() => setPlayingState(true)).catch(() => {});
-        }
-      }
+      _recoverPlaybackAfterResume('visibilitychange');
     }
 
     if (currentSong) {
       try {
         updateAllPlayerUI(currentSong);
-        setPlayingState(!audio.paused);
+        if (!isPlaying) setPlayingState(!audio.paused);
         updateMediaSession(currentSong);
       } catch (_) { }
     }
@@ -3425,24 +3520,38 @@
     }
   });
 
-  // FIX-4: Page Lifecycle API handlers (Android Chrome background freezing/thawing)
-  // 'freeze' fires when the browser freezes the page to save resources.
-  // 'resume' fires when the page is brought back to life.
+  // Page Lifecycle API: Android Chrome freezes/thaws background tabs
   document.addEventListener('freeze', () => {
-    console.log('[Player] Page lifecycle: freeze — ensuring MediaSession is active');
-    if (currentSong && isPlaying) {
-      try { updateMediaSession(currentSong); } catch (_) {}
+    console.log('[Player] Lifecycle: freeze — locking in MediaSession state');
+    if (currentSong && isPlaying && 'mediaSession' in navigator) {
+      try {
+        updateMediaSession(currentSong);
+        navigator.mediaSession.playbackState = 'playing'; // tell OS we're still active
+      } catch (_) {}
     }
   });
 
   document.addEventListener('resume', () => {
-    console.log('[Player] Page lifecycle: resume — re-syncing player state');
+    console.log('[Player] Lifecycle: resume — page thawed from freeze');
+    // Check if a song ended while the page was frozen
+    if (isPlaying) {
+      _recoverPlaybackAfterResume('resume');
+    }
     if (currentSong) {
       try {
         updateAllPlayerUI(currentSong);
-        setPlayingState(!audio.paused);
         updateMediaSession(currentSong);
       } catch (_) {}
+    }
+  });
+
+  // iOS Safari uses BFCache (Back-Forward Cache) — 'pageshow' fires on restore
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) {
+      console.log('[Player] iOS BFCache restore (pageshow persisted) — recovering playback');
+      if (isPlaying) {
+        _recoverPlaybackAfterResume('pageshow-bfcache');
+      }
     }
   });
 
