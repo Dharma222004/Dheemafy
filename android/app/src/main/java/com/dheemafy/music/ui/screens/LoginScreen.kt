@@ -60,6 +60,7 @@ fun LoginScreen(
                 .padding(horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
+        ) {
             Image(
                 painter = painterResource(id = R.drawable.dheemafy_logo),
                 contentDescription = "Dheemafy Logo",
