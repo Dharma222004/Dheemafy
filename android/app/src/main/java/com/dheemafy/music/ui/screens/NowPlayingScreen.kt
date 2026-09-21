@@ -21,9 +21,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import com.dheemafy.music.data.model.Album
+import com.dheemafy.music.data.model.Artist
+import com.dheemafy.music.data.model.Song
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.playback.PlaybackState
+import com.dheemafy.music.ui.components.SongCoverImage
 import com.dheemafy.music.ui.theme.*
 import kotlinx.coroutines.launch
 import java.util.Locale
