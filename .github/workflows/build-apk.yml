@@ -3,7 +3,13 @@ name: Build Dheemafy Android APK
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
+      - 'android*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -48,3 +54,32 @@ jobs:
           name: Dheemafy-APK
           path: build-output/
           retention-days: 30
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: android-v1.0.0
+          name: "Dheemafy Android v1.0.0"
+          draft: false
+          prerelease: false
+          body: |
+            ## Dheemafy Android Application (v1.0.0) 🎵
+            
+            Official native Android APK build for Dheemafy private music streaming.
+            
+            ### ✨ Features
+            - **Native Media3 ExoPlayer**: Continuous, seamless playback with no random stopping.
+            - **Foreground Media Playback Service**: Survives app closing, screen lock, and device sleep.
+            - **Lock Screen & Notification Controls**: Integrated Android system media notification with cover art and controls.
+            - **Audio Focus**: Automatically ducks or pauses during phone calls and alarms; pauses on headphone disconnect.
+            - **Strict Playlist Isolation**: Queues belong strictly to the selected playlist (Sharu, Hills, All Songs).
+            - **Jetpack Compose UI**: Modern Spotify dark theme with large artwork visual and scrubber seekbar.
+            
+            ### 📲 Direct Installation
+            1. Download **`Dheemafy.apk`** below to your Android device.
+            2. Tap to install (enable **"Install from unknown sources"** if prompted).
+            3. Log in with your authorized credentials (`sharu` or `you`).
+          files: |
+            build-output/Dheemafy.apk
+            build-output/Dheemafy-debug.apk
