@@ -45,8 +45,8 @@ fun NowPlayingScreen(
 
     var isDraggingSlider by remember { mutableStateOf(false) }
     var draggedPositionMs by remember { mutableLongStateOf(0L) }
-
-    val displayPositionMs = if (isDraggingSlider) draggedPositionMs else playbackState.currentPositionMs
+    val currentPositionFromTicker by playbackManager.positionMs.collectAsState()
+    val displayPositionMs = if (isDraggingSlider) draggedPositionMs else currentPositionFromTicker
     val durationMs = playbackState.durationMs.coerceAtLeast(1L)
 
     Box(

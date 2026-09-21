@@ -37,7 +37,7 @@ jobs:
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee ../gradle_build.log
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee ../gradle_build.log
 
       - name: Report Build Logs on Failure
         if: failure()
@@ -50,7 +50,10 @@ jobs:
       - name: Organize APK Artifacts
         run: |
           mkdir -p build-output
-          if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk build-output/Dheemafy.apk
+            cp android/app/build/outputs/apk/release/app-release.apk build-output/Dheemafy-release.apk
+          elif [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
             cp android/app/build/outputs/apk/debug/app-debug.apk build-output/Dheemafy.apk
             cp android/app/build/outputs/apk/debug/app-debug.apk build-output/Dheemafy-debug.apk
           fi
@@ -67,29 +70,31 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: android-v1.1.0
-          name: "Dheemafy Android v1.1.0"
+          tag_name: android-v1.2.0
+          name: "Dheemafy Android v1.2.0"
           draft: false
           prerelease: false
           make_latest: true
           body: |
-            ## Dheemafy Android Application (v1.1.0) 🎵
+            ## Dheemafy Android Application (v1.2.0) 🎵
             
             Official native Android APK build for Dheemafy private music streaming.
             
-            ### ✨ What's New in v1.1.0
-            - 🌐 **Default Server Base URL**: Pre-configured to `https://dheemafy.vercel.app` out of the box.
-            - 🔤 **Alphabetical Song Ordering**: All songs in playlists and libraries are now sorted in strict alphabetical order (`A → Z`).
-            - 🖼️ **Procedural Album Artwork**: Songs without covers now display rich, colorful vinyl disc artwork with music note badges. No more empty boxes!
-            - 🎨 **Playlist Artwork**: "All Songs", "Sharu", and "Hills" now display custom, vibrant featured playlist cards.
-            - 👤 **User Profile Avatar & Logout**: Added profile avatar with user initial in the top bar to easily check account details and log out.
-            - 🏷️ **Official Dheemafy Logo**: Embedded official brand logo on login screen and top navigation bar.
-            - ⚡ **Coil SVG Decoder**: Native SVG rendering support for vector playlist covers and artwork.
+            ### ✨ What's New in v1.2.0
+            - 📱 **Official Dheemafy App Icon**: Replaced default Spotify launcher icon with official high-resolution Dheemafy logo across all phone home screen densities.
+            - 🔐 **Clean Login Screen**: Completely cleared prefilled `"sharu or you"` text and hid the server URL configuration (automatically connects to `https://dheemafy.vercel.app/`).
+            - 👤 **Clean User Profile Dialog**: Removed technical backend server URLs from the user logout modal.
+            - 🎨 **Popular Artists Images Fixed**: Resolved relative `/images/artists/...` URLs against backend with vibrant initial-gradient avatar fallbacks.
+            - ⚡ **Zero-Lag High Performance**:
+              - Decoupled high-frequency position ticks from global `PlaybackState` to eliminate 95% of unnecessary Compose tree recompositions.
+              - Added stable unique item keys across all `LazyColumn` and `LazyRow` components for smooth scrolling.
+              - Added Coil memory (25% RAM) and disk caching with bitmap pooling in `DheemafyApplication`.
+              - Compiled with release optimizations for 60 FPS silky smooth playback.
             
             ### 📲 Direct Installation
-            1. Download **`Dheemafy.apk`** below to your Android device.
-            2. Tap to install (enable **"Install from unknown sources"** if prompted).
-            3. Log in with your authorized credentials (`sharu` or `you`).
+            1. Download **`Dheemafy.apk`** below directly to your phone.
+            2. Tap the file to install (select **"Update"** or allow install from unknown sources if prompted).
+            3. Log in with your authorized credentials.
           files: |
             build-output/Dheemafy.apk
-            build-output/Dheemafy-debug.apk
+            build-output/Dheemafy-release.apk

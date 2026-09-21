@@ -20,10 +20,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.dheemafy.music.data.model.ArtistDetail
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.playback.PlaybackState
+import com.dheemafy.music.ui.components.ArtistFallbackAvatar
 import com.dheemafy.music.ui.components.SongRow
 import com.dheemafy.music.ui.theme.*
 import kotlinx.coroutines.launch
@@ -143,27 +145,22 @@ fun ArtistDetailScreen(
                                 .clip(CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (!detail.largeImageUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = detail.largeImageUrl,
+                            val imgUrl = detail.resolvedLargeImageUrl
+                            if (imgUrl.isNotBlank()) {
+                                SubcomposeAsyncImage(
+                                    model = imgUrl,
                                     contentDescription = detail.name,
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
+                                    loading = {
+                                        ArtistFallbackAvatar(name = detail.name)
+                                    },
+                                    error = {
+                                        ArtistFallbackAvatar(name = detail.name)
+                                    }
                                 )
                             } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(SpotifyElevated),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = null,
-                                        tint = SpotifyGrayText,
-                                        modifier = Modifier.size(64.dp)
-                                    )
-                                }
+                                ArtistFallbackAvatar(name = detail.name)
                             }
                         }
 
@@ -229,7 +226,7 @@ fun ArtistDetailScreen(
                     )
                 }
 
-                itemsIndexed(songs) { index, song ->
+                itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
                     val isCurrent = playbackState.currentSong?.id == song.id
                     SongRow(
                         song = song,

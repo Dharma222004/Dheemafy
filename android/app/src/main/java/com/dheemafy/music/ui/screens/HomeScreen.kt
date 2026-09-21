@@ -122,20 +122,11 @@ fun HomeScreen(
                 }
             },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Connected Backend:",
-                        color = SpotifySubtleGray,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = sessionManager.getBaseUrl(),
-                        color = SpotifyGreenBright,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                Text(
+                    text = "Are you sure you want to log out of Dheemafy?",
+                    color = SpotifyGrayText,
+                    fontSize = 14.sp
+                )
             },
             confirmButton = {
                 Button(
@@ -275,7 +266,7 @@ fun HomeScreen(
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
-                            items(data.featuredPlaylists) { playlist ->
+                            items(data.featuredPlaylists, key = { it.id }) { playlist ->
                                 PlaylistItemCard(
                                     playlist = playlist,
                                     onClick = { onPlaylistClick(playlist.id, playlist.name) },
@@ -298,7 +289,7 @@ fun HomeScreen(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
-                    items(data.quickPicks) { song ->
+                    items(data.quickPicks, key = { it.id }) { song ->
                         val isCurrent = playbackState.currentSong?.id == song.id
                         SongRow(
                             song = song,
@@ -331,7 +322,7 @@ fun HomeScreen(
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
-                            items(data.popularArtists) { artist ->
+                            items(data.popularArtists, key = { it.id }) { artist ->
                                 ArtistItemCard(
                                     artist = artist,
                                     onClick = { onArtistClick(artist.id, artist.name) }
@@ -353,7 +344,7 @@ fun HomeScreen(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
-                    items(data.trending) { song ->
+                    items(data.trending, key = { it.id }) { song ->
                         val isCurrent = playbackState.currentSong?.id == song.id
                         SongRow(
                             song = song,

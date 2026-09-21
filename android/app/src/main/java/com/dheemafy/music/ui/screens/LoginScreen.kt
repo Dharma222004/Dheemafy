@@ -11,8 +11,6 @@ import com.dheemafy.music.R
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,8 +40,6 @@ fun LoginScreen(
 
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var serverUrl by remember { mutableStateOf(sessionManager.getBaseUrl()) }
-    var showServerConfig by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -110,7 +106,6 @@ fun LoginScreen(
                     errorMessage = null
                 },
                 label = { Text("Username") },
-                placeholder = { Text("sharu or you") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
@@ -134,7 +129,6 @@ fun LoginScreen(
                     errorMessage = null
                 },
                 label = { Text("Password") },
-                placeholder = { Text("••••••••") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -194,47 +188,6 @@ fun LoginScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            TextButton(
-                onClick = { showServerConfig = !showServerConfig }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = null,
-                    tint = SpotifySubtleGray,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (showServerConfig) "Hide Server Settings" else "Configure Server URL",
-                    color = SpotifySubtleGray,
-                    fontSize = 12.sp
-                )
-            }
-
-            if (showServerConfig) {
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = serverUrl,
-                    onValueChange = {
-                        serverUrl = it
-                        sessionManager.saveBaseUrl(it)
-                    },
-                    label = { Text("Server Base URL") },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = SpotifyGreen,
-                        unfocusedBorderColor = SpotifyDivider,
-                        focusedTextColor = SpotifyWhite,
-                        unfocusedTextColor = SpotifyWhite,
-                        focusedLabelColor = SpotifyGreen,
-                        unfocusedLabelColor = SpotifyGrayText
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         }
     }

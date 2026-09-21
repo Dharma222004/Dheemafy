@@ -262,7 +262,7 @@ fun PlaylistDetailScreen(
                 }
 
                 // Track List (Sorted Alphabetically A-Z)
-                itemsIndexed(tracks) { index, song ->
+                itemsIndexed(tracks, key = { _, song -> song.id }) { index, song ->
                     val isCurrent = playbackState.currentSong?.id == song.id
                     SongRow(
                         song = song,

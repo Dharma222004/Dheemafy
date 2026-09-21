@@ -63,7 +63,17 @@ data class Artist(
     @SerializedName("slug") val slug: String? = null,
     @SerializedName("large_image_url") val largeImageUrl: String? = null,
     @SerializedName("song_count") val songCount: Int? = 0
-)
+) {
+    val resolvedLargeImageUrl: String
+        get() {
+            val raw = largeImageUrl?.trim().orEmpty()
+            return when {
+                raw.isBlank() -> ""
+                raw.startsWith("http://") || raw.startsWith("https://") -> raw
+                else -> "https://dheemafy.vercel.app/${raw.trimStart('/')}"
+            }
+        }
+}
 
 data class ArtistDetail(
     @SerializedName("id") val id: String,
@@ -74,7 +84,17 @@ data class ArtistDetail(
     @SerializedName("songs") val songs: List<Song> = emptyList(),
     @SerializedName("popularSongs") val popularSongs: List<Song> = emptyList(),
     @SerializedName("albums") val albums: List<Album> = emptyList()
-)
+) {
+    val resolvedLargeImageUrl: String
+        get() {
+            val raw = largeImageUrl?.trim().orEmpty()
+            return when {
+                raw.isBlank() -> ""
+                raw.startsWith("http://") || raw.startsWith("https://") -> raw
+                else -> "https://dheemafy.vercel.app/${raw.trimStart('/')}"
+            }
+        }
+}
 
 data class Album(
     @SerializedName("id") val id: String,

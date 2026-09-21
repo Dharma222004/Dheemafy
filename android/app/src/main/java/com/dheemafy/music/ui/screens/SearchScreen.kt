@@ -175,7 +175,7 @@ fun SearchScreen(
                                 LazyRow(
                                     contentPadding = PaddingValues(horizontal = 12.dp)
                                 ) {
-                                    items(artists) { artist ->
+                                    items(artists, key = { it.id }) { artist ->
                                         ArtistItemCard(
                                             artist = artist,
                                             onClick = { onArtistClick(artist.id, artist.name) }
@@ -197,7 +197,7 @@ fun SearchScreen(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             }
-                            items(songs) { song ->
+                            items(songs, key = { it.id }) { song ->
                                 val isCurrent = playbackState.currentSong?.id == song.id
                                 SongRow(
                                     song = song,

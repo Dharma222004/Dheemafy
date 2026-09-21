@@ -26,6 +26,9 @@ class PlaybackManager(private val context: Context) {
     private val _playbackState = MutableStateFlow(PlaybackState())
     val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
+    private val _positionMs = MutableStateFlow(0L)
+    val positionMs: StateFlow<Long> = _positionMs.asStateFlow()
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private var positionJob: Job? = null
@@ -99,6 +102,8 @@ class PlaybackManager(private val context: Context) {
         val isBuffering = ctrl.playbackState == Player.STATE_BUFFERING
         val isPlaying = ctrl.isPlaying
 
+        _positionMs.value = position
+
         _playbackState.update { current ->
             current.copy(
                 currentSong = currentSong,
@@ -118,15 +123,21 @@ class PlaybackManager(private val context: Context) {
     private fun startPositionTicker() {
         stopPositionTicker()
         positionJob = scope.launch {
+            var tickCount = 0
             while (isActive) {
                 controller?.let { ctrl ->
                     if (ctrl.isPlaying) {
                         val pos = ctrl.currentPosition.coerceAtLeast(0L)
-                        val dur = ctrl.duration.takeIf { it > 0 }
-                            ?: _playbackState.value.currentSong?.duration ?: 0L
+                        _positionMs.value = pos
 
-                        _playbackState.update {
-                            it.copy(currentPositionMs = pos, durationMs = dur)
+                        tickCount++
+                        // Throttle full PlaybackState updates to once every 1.5s to prevent Compose tree lag
+                        if (tickCount % 5 == 0) {
+                            val dur = ctrl.duration.takeIf { it > 0 }
+                                ?: _playbackState.value.currentSong?.duration ?: 0L
+                            _playbackState.update {
+                                it.copy(currentPositionMs = pos, durationMs = dur)
+                            }
                         }
                     }
                 }
@@ -175,6 +186,7 @@ class PlaybackManager(private val context: Context) {
     fun seekTo(positionMs: Long) {
         val ctrl = controller ?: return
         ctrl.seekTo(positionMs)
+        _positionMs.value = positionMs
         _playbackState.update { it.copy(currentPositionMs = positionMs) }
     }
 
