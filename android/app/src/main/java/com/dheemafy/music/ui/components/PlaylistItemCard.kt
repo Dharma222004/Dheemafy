@@ -107,7 +107,7 @@ fun PlaylistFallbackCard(
         when {
             name.contains("all", ignoreCase = true) -> Triple(
                 listOf(Color(0xFF1E3A8A), Color(0xFF0F172A)),
-                Icons.Default.QueueMusic,
+                Icons.Default.PlayArrow,
                 "ALL SONGS"
             )
             name.contains("sharu", ignoreCase = true) -> Triple(
@@ -117,12 +117,12 @@ fun PlaylistFallbackCard(
             )
             name.contains("hills", ignoreCase = true) -> Triple(
                 listOf(Color(0xFF047857), Color(0xFF064E3B)),
-                Icons.Default.Landscape,
+                Icons.Default.Star,
                 "HILLS"
             )
             else -> Triple(
                 listOf(Color(0xFF334155), Color(0xFF0F172A)),
-                Icons.Default.MusicNote,
+                Icons.Default.FavoriteBorder,
                 "PLAYLIST"
             )
         }

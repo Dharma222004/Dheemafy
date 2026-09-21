@@ -80,7 +80,6 @@ dependencies {
 
     // Image loading
     implementation(libs.coil.compose)
-    implementation(libs.coil.svg)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
