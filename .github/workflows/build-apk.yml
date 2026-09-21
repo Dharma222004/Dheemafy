@@ -3,9 +3,6 @@ name: Build Dheemafy Android APK
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'android/**'
-      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
@@ -22,30 +19,26 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Grant Execute Permission to gradlew
         run: chmod +x android/gradlew
 
-      - name: Build Debug & Release APKs
+      - name: Build Android APKs
         working-directory: android
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
-          ./gradlew assembleDebug assembleRelease --stacktrace
+          ./gradlew assembleDebug --stacktrace
 
       - name: Organize APK Artifacts
         run: |
           mkdir -p build-output
-          # Copy debug apk as Dheemafy.apk (primary installable package)
           if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
             cp android/app/build/outputs/apk/debug/app-debug.apk build-output/Dheemafy.apk
             cp android/app/build/outputs/apk/debug/app-debug.apk build-output/Dheemafy-debug.apk
-          fi
-          # Copy release apk if generated
-          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk build-output/Dheemafy-release.apk
           fi
           ls -la build-output
 
