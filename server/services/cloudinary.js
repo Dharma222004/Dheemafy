@@ -66,7 +66,12 @@ async function scanAudioResources(folder = defaultFolder, nextCursor = null) {
       };
     }
   } catch (searchErr) {
-    console.warn('[Cloudinary] Search API note, falling back to Admin API:', searchErr.message);
+    const errorMsg = searchErr?.error?.message || searchErr?.message || String(searchErr);
+    const isRateLimit = searchErr?.error?.http_code === 420 || searchErr?.http_code === 420 || errorMsg.includes('Rate Limit');
+    if (isRateLimit) {
+      throw searchErr;
+    }
+    console.warn('[Cloudinary] Search API note, falling back to Admin API:', errorMsg);
   }
 
   // 2. Try resources_by_asset_folder if a folder is specified
@@ -82,7 +87,9 @@ async function scanAudioResources(folder = defaultFolder, nextCursor = null) {
         };
       }
     } catch (err) {
-      console.warn(`[Cloudinary] Note on asset_folder scan for "${folder}":`, err.message);
+      const isRateLimit = err?.error?.http_code === 420 || err?.http_code === 420 || (err?.error?.message && err.error.message.includes('Rate Limit'));
+      if (isRateLimit) throw err;
+      console.warn(`[Cloudinary] Note on asset_folder scan for "${folder}":`, err?.error?.message || err?.message || err);
     }
   }
 

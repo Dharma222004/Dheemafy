@@ -85,7 +85,15 @@ app.all('/api/sync', async (req, res) => {
     const result = await syncCloudinaryCatalog(folder);
     res.json({ success: true, data: result });
   } catch (err) {
-    res.status(500).json({ success: false, error: { message: err.message } });
+    const msg = (err && (err.message || (err.error && err.error.message))) || 'Sync operation failed';
+    const httpCode = (err && (err.http_code || (err.error && err.error.http_code))) || 500;
+    res.status(httpCode >= 400 && httpCode < 600 ? httpCode : 500).json({
+      success: false,
+      error: {
+        message: msg,
+        httpCode
+      }
+    });
   }
 });
 
@@ -95,7 +103,15 @@ app.all('/api/revalidate', async (req, res) => {
     const result = await syncCloudinaryCatalog('Songs');
     res.json({ revalidated: true, data: result });
   } catch (err) {
-    res.status(500).json({ revalidated: false, error: { message: err.message } });
+    const msg = (err && (err.message || (err.error && err.error.message))) || 'Revalidation failed';
+    const httpCode = (err && (err.http_code || (err.error && err.error.http_code))) || 500;
+    res.status(httpCode >= 400 && httpCode < 600 ? httpCode : 500).json({
+      revalidated: false,
+      error: {
+        message: msg,
+        httpCode
+      }
+    });
   }
 });
 

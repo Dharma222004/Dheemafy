@@ -476,14 +476,15 @@ async function syncCloudinaryCatalog(customFolder = 'Songs') {
       details: summary
     };
   } catch (err) {
-    console.error('[Sync] Fatal error during sync:', err);
+    const errorMsg = (err && (err.message || (err.error && err.error.message))) || String(err);
+    console.error('[Sync] Fatal error during sync:', errorMsg);
     db.prepare(`
       UPDATE cloudinary_sync_log SET
         completed_at = CURRENT_TIMESTAMP,
         status = 'FAILED',
         details = ?
       WHERE id = ?
-    `).run(`Fatal Error: ${err.message}`, logId);
+    `).run(`Fatal Error: ${errorMsg}`, logId);
     throw err;
   }
 }
