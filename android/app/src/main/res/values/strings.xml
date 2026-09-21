@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Dheemafy</string>
+    <string name="login_title">Log in to Dheemafy</string>
+    <string name="username_hint">Username (e.g. sharu or you)</string>
+    <string name="password_hint">Password</string>
+    <string name="login_btn">Log In</string>
+    <string name="quick_picks">Quick picks</string>
+    <string name="featured_playlists">Featured Playlists</string>
+    <string name="popular_artists">Popular Artists</string>
+    <string name="trending_now">Trending Now</string>
+    <string name="all_songs">All Songs</string>
+    <string name="search_hint">What do you want to play?</string>
+</resources>
