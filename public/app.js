@@ -54,10 +54,22 @@
     return [currentIdx, ...indices];
   }
 
-  // Audio Engine
+  // Audio Engine — Single Authoritative Playback Element
   const audio = document.getElementById('spotifyAudioEngine');
+  let _userExplicitPause = false;
+
   if (audio) {
     audio.preload = 'auto';
+
+    // Intercept and instrument audio.pause() to identify exactly WHO/WHAT stops playback
+    const _origAudioPause = audio.pause.bind(audio);
+    audio.pause = function () {
+      const err = new Error();
+      const stack = (err.stack || '').split('\n').slice(2, 6).join('\n');
+      console.warn('[PLAYER] PAUSE CALLED');
+      console.warn('[PLAYER] CALLER/CONTEXT:\n' + stack);
+      return _origAudioPause();
+    };
   }
 
   // ==========================================================================
@@ -98,35 +110,16 @@
       return song.audio_url || song.audioUrl || null;
     }
 
-    // Pre-warm upcoming track connections natively via link prefetch
+    // Pre-warm upcoming track connections
+    // Heavy link[rel="prefetch"] downloads of 5x 10MB MP3s are disabled because
+    // downloading 50MB in background starves the active playback stream of bandwidth.
     function preloadTrack(song) {
-      if (!song) return;
-      const directUrl = song.audio_url || song.audioUrl;
-      if (!directUrl) return;
-      try {
-        const existing = document.querySelector(`link[rel="prefetch"][href="${directUrl}"]`);
-        if (!existing) {
-          const link = document.createElement('link');
-          link.rel = 'prefetch';
-          link.href = directUrl;
-          link.as = 'audio';
-          document.head.appendChild(link);
-        }
-      } catch (_) { }
+      return;
     }
 
     // Pre-warms upcoming songs in the current queue sequentially
     function preloadUpcoming(currentIndex, playlist, count = 5) {
-      if (!playlist || playlist.length <= 1 || currentIndex < 0) return;
-      try {
-        const len = playlist.length;
-        for (let i = 1; i <= Math.min(count, len - 1); i++) {
-          const nextIdx = (currentIndex + i) % len;
-          if (playlist[nextIdx]) {
-            preloadTrack(playlist[nextIdx]);
-          }
-        }
-      } catch (_) { }
+      return;
     }
 
     return {
@@ -2024,25 +2017,26 @@
   // Internal: resolve song index with guard
   function _doPlayTrack(song, index, directStreamUrl) {
     const trackLabel = `"${song.title}" [${index + 1}/${activePlaybackPlaylist.length}] id=${song.id}`;
-    console.log(`[Player] ▶ PLAY: ${trackLabel}`);
-    console.log(`[Player]   URL: ${directStreamUrl}`);
-    console.log(`[Player]   audio.src BEFORE: ${audio.src ? audio.src.substring(0, 80) : 'empty'}`);
-    console.log(`[Player]   audio.readyState BEFORE: ${audio.readyState}`);
-    console.log(`[Player]   audio.networkState BEFORE: ${audio.networkState}`);
-    console.log(`[Player]   audio.error BEFORE: ${audio.error ? audio.error.code : 'none'}`);
-    console.log(`[Player]   _isTransitioning: ${_isTransitioning}, isPlaying: ${isPlaying}`);
+    _userExplicitPause = false;
 
-    // KEY FIX 1: Always set src and call load() before play().
-    // On mobile WebKit/Chrome, omitting audio.load() after src change
-    // causes play() to fail silently on the 3rd+ track because the audio
-    // element is stuck in NETWORK_LOADING state from the previous stream abort.
+    console.log('[PLAYER] USER PLAY');
+    console.log(`[PLAYER] SONG ID: ${song.id}`);
+    console.log(`[PLAYER] AUDIO SRC: ${directStreamUrl}`);
+    console.log(`[PLAYER] AUDIO READY STATE: ${audio.readyState}`);
+    console.log(`[PLAYER] NETWORK STATE: ${audio.networkState}`);
+
+    const oldSrc = audio.src || '';
+    if (oldSrc !== directStreamUrl) {
+      console.log('[PLAYER] SRC CHANGED');
+      console.log(`[PLAYER] OLD SRC: ${oldSrc}`);
+      console.log(`[PLAYER] NEW SRC: ${directStreamUrl}`);
+    }
+
     _lastSrcChangedAt = Date.now();
     audio.src = directStreamUrl;
     audio.dataset.currentSongId = song.id;
-    audio.load(); // ← CRITICAL: resets decoder and network state for new src
+    audio.load(); // ← Resets decoder and network state for new src
     _lastTimeUpdateAt = Date.now();
-
-    console.log(`[Player]   audio.src AFTER load(): ${audio.src ? audio.src.substring(0, 80) : 'empty'}`);
 
     // Update MediaSession for lock screen immediately
     updateMediaSession(song);
@@ -2051,14 +2045,6 @@
     }
 
     // BACKGROUND-SAFE PLAY ENGINE
-    // ─────────────────────────────────────────────────────────────────────────
-    // Android Chrome throttles setTimeout to 1-MINUTE intervals in background
-    // tabs. If audio.play() gets AbortError when screen is locked, a 300ms
-    // setTimeout retry fires 60 seconds later (too late — Chrome has frozen
-    // the tab by then). The fix: use 'canplay' event instead of setTimeout.
-    // 'canplay' is a native media event fired by the browser's audio pipeline,
-    // NOT a JS timer — Chrome fires it even in fully throttled background tabs.
-    // ─────────────────────────────────────────────────────────────────────────
     function _attemptPlay(retryCount) {
       if (currentSong && currentSong.id !== song.id) {
         console.log(`[Player] ✗ Aborted stale play for ${trackLabel} (superseded by another track)`);
@@ -2071,16 +2057,22 @@
       if (p === undefined) {
         _isTransitioning = false;
         setPlayingState(true);
-        console.log(`[Player] ✓ Play (sync) confirmed: ${trackLabel}`);
+        console.log(`[PLAYER] PLAY CONFIRMED (sync): ${trackLabel}`);
         return;
       }
       p.then(() => {
         _isTransitioning = false;
         setPlayingState(true);
-        console.log(`[Player] ✓ Play confirmed: ${trackLabel}`);
+        console.log(`[PLAYER] PLAY CONFIRMED: ${trackLabel}`);
       }).catch(err => {
-        console.warn(`[Player] ✗ Play error [${err.name}] for ${trackLabel}: ${err.message}`);
-        console.warn(`[Player]   readyState=${audio.readyState} networkState=${audio.networkState} error=${audio.error ? audio.error.code : 'none'}`);
+        console.error('[PLAYER] PLAY FAILED', {
+          name: err.name,
+          message: err.message,
+          src: audio.src,
+          currentTime: audio.currentTime,
+          readyState: audio.readyState,
+          networkState: audio.networkState
+        });
 
         if (err.name === 'AbortError') {
           // AbortError = browser aborted previous load when src changed. Normal.
@@ -2289,6 +2281,7 @@
 
   function pausePlayback() {
     console.log(`[Player] Pausing playback: "${currentSong ? currentSong.title : 'Unknown'}"`);
+    _userExplicitPause = true;
     _isTransitioning = false;
     audio.pause();
     setPlayingState(false);
@@ -2425,18 +2418,19 @@
 
   // Audio Event Listeners
   audio.addEventListener('play', () => {
-    console.log('[Player] Audio event: play');
+    console.log('[PLAYER] PLAY EVENT');
     setPlayingState(true);
   });
   audio.addEventListener('playing', () => {
-    console.log('[Player] Audio event: playing');
+    console.log('[PLAYER] PLAYING EVENT');
+    console.log(`[PLAYER] CURRENT TIME: ${audio.currentTime ? audio.currentTime.toFixed(2) : 0}`);
     _isTransitioning = false;
     setPlayingState(true);
     setLoadingState(false);
   });
   audio.addEventListener('pause', () => {
     const srcAgeMs = Date.now() - _lastSrcChangedAt;
-    console.log(`[Player] Audio event: pause — ended=${audio.ended}, transitioning=${_isTransitioning}, srcAge=${srcAgeMs}ms, currentTime=${audio.currentTime.toFixed(2)}`);
+    console.log(`[PLAYER] PAUSE EVENT (readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime.toFixed(2)}, explicit=${_userExplicitPause})`);
 
     // GUARD 1: Song just finished naturally — browser fires pause right after ended.
     if (audio.ended) {
@@ -2451,25 +2445,57 @@
     }
 
     // GUARD 3: Src was just changed — mobile browsers fire a spurious pause when
-    // audio.src changes and audio.load() is called. Window is 800ms (tightened
-    // from 2000ms) because audio.load() + canplay fires within ~100-200ms on mobile.
+    // audio.src changes and audio.load() is called. Window is 800ms.
     if (srcAgeMs < 800) {
       console.log(`[Player] Pause suppressed — src changed ${srcAgeMs}ms ago (mobile load transient).`);
       return;
     }
 
-    // Genuine user pause or OS-forced pause — update state.
-    console.log('[Player] Genuine pause detected — setting isPlaying=false');
-    if (audio.paused) {
+    // User explicitly pressed pause
+    if (_userExplicitPause) {
+      console.log('[Player] Explicit user pause confirmed.');
       setPlayingState(false);
+    } else if (isPlaying) {
+      // System/browser pause (e.g. transient buffer stall, mobile screen lock flutter)
+      // DO NOT surrender isPlaying=true. Schedule auto-resume.
+      console.warn('[Player] Transient system pause detected while isPlaying=true. Auto-resuming...');
+      setTimeout(() => {
+        if (isPlaying && audio.paused && !_userExplicitPause && !_isTransitioning) {
+          audio.play().then(() => {
+            setPlayingState(true);
+            console.log('[Player] Auto-resumed after transient system pause.');
+          }).catch(err => {
+            console.warn('[Player] Auto-resume deferred:', err.name);
+          });
+        }
+      }, 300);
     }
+  });
+
+  audio.addEventListener('waiting', () => {
+    console.warn(`[PLAYER] WAITING EVENT (readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime.toFixed(2)})`);
+    setLoadingState(true);
+  });
+
+  audio.addEventListener('stalled', () => {
+    console.warn(`[PLAYER] STALLED EVENT (readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime.toFixed(2)})`);
+    setLoadingState(true);
+  });
+
+  audio.addEventListener('suspend', () => {
+    console.log(`[PLAYER] SUSPEND EVENT (readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime.toFixed(2)})`);
+  });
+
+  audio.addEventListener('abort', () => {
+    console.log(`[PLAYER] ABORT EVENT (readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime.toFixed(2)})`);
   });
 
   audio.addEventListener('error', () => {
     const err = audio.error;
     const code = err ? err.code : 'unknown';
-    // MEDIA_ERR_ABORTED (code 1) is completely normal when changing track sources.
-    // NEVER abort or skip when a previous stream was cleanly aborted!
+    console.error(`[PLAYER] ERROR EVENT (code=${code}, readyState=${audio.readyState}, networkState=${audio.networkState})`);
+
+    // MEDIA_ERR_ABORTED (code 1) is normal when changing track sources.
     if (code === 1 || code === '1') {
       console.log('[Player] Normal track transition abort (code 1). Ignored.');
       return;
@@ -2487,14 +2513,21 @@
     if (currentSong && !document.hidden) {
       showToast(`⚠ Could not play "${currentSong.title}". Skipping...`);
     }
-    // Auto-advance to next song after short delay if queue or library has tracks
     const availableCount = (activePlaybackPlaylist && activePlaybackPlaylist.length) || (allSongs && allSongs.length) || 0;
     if (availableCount > 1) {
       setTimeout(() => playNextTrack(true), 1500);
     }
   });
 
+  // Additional Media Lifecycle Event Diagnostics
+  ['loadstart', 'loadeddata', 'canplaythrough', 'durationchange', 'progress', 'seeking', 'seeked', 'emptied'].forEach(evtName => {
+    audio.addEventListener(evtName, () => {
+      console.log(`[PLAYER] ${evtName.toUpperCase()} EVENT (readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime ? audio.currentTime.toFixed(2) : 0})`);
+    });
+  });
+
   audio.addEventListener('loadedmetadata', () => {
+    console.log(`[PLAYER] LOADEDMETADATA EVENT (duration=${audio.duration})`);
     const total = audio.duration;
     if (total && !isNaN(total) && total > 0) {
       const rounded = Math.round(total);
@@ -2510,8 +2543,7 @@
     }
   });
 
-  // Pre-buffer tracking: song ID for which we've already triggered preload
-  let _prebufferedForSongId = null;
+  let _lastTimeupdateLog = 0;
 
   audio.addEventListener('timeupdate', () => {
     if (isSeeking) return;
@@ -2520,6 +2552,15 @@
     const total = (audio.duration && !isNaN(audio.duration) && audio.duration > 0)
       ? audio.duration
       : (currentSong && currentSong.duration ? currentSong.duration : 0);
+
+    // Periodic diagnostic log (throttled to every 3s)
+    const now = Date.now();
+    if (now - _lastTimeupdateLog > 3000) {
+      _lastTimeupdateLog = now;
+      console.log(`[PLAYER] TIMEUPDATE: ${current.toFixed(1)}s / ${total.toFixed(1)}s`);
+      console.log(`[PLAYER] READY STATE: ${audio.readyState}`);
+      console.log(`[PLAYER] NETWORK STATE: ${audio.networkState}`);
+    }
 
     barCurrentTime.textContent = formatDuration(current);
     if (fsCurrentTime) fsCurrentTime.textContent = formatDuration(current);
@@ -2533,43 +2574,13 @@
       if (fsProgressFill) fsProgressFill.style.width = `${pct}%`;
       if (fsProgressThumb) fsProgressThumb.style.left = `${pct}%`;
 
-      // PRE-BUFFER: When within 5 seconds of end, eagerly buffer the next track.
-      // timeupdate is fired by the native audio pipeline, not JS timers, so it
-      // fires reliably even when screen is locked and Chrome has throttled timers.
-      // This ensures the next song is already loaded when 'ended' fires, making
-      // the transition instant (no silence gap that could trigger Chrome throttling).
-      const timeLeft = total - current;
-      if (total > 15 && timeLeft <= 5 && timeLeft > 0 && !_isTransitioning && isPlaying) {
-        const nextIdx = (currentTrackIndex + 1) % activePlaybackPlaylist.length;
-        const nextSong = nextIdx >= 0 ? activePlaybackPlaylist[nextIdx] : null;
-        if (nextSong && _prebufferedForSongId !== nextSong.id) {
-          _prebufferedForSongId = nextSong.id;
-          const nextUrl = nextSong.audio_url || nextSong.audioUrl;
-          if (nextUrl) {
-            console.log(`[Player] Pre-buffering next track (${timeLeft.toFixed(1)}s left): "${nextSong.title}"`);
-            // Use a hidden Audio element to start loading the next track's data.
-            // When 'ended' fires and we set audio.src = nextUrl, the browser
-            // will use the already-buffered data for an instant start.
-            try {
-              if (!window._dheemafyPreloadEl) {
-                window._dheemafyPreloadEl = new Audio();
-                window._dheemafyPreloadEl.preload = 'auto';
-              }
-              window._dheemafyPreloadEl.src = nextUrl;
-              window._dheemafyPreloadEl.load();
-            } catch (_) {}
-          }
-        }
-      }
-
-      // FALLBACK: If audio reached end and paused but 'ended' event didn't fire
+      // Fallback: If audio reached end of stream and paused but native 'ended' was dropped
       if (total > 10 && current >= (total - 0.5) && audio.paused && isPlaying && !_isTransitioning) {
         console.log('[Player] timeupdate fallback: stream ended, advancing to next track.');
         handleSongEnded();
         return;
       }
     }
-    const now = Date.now();
     if (now - _lastMsUpdate > 1000) {
       _lastMsUpdate = now;
       updateMediaSessionPlaybackState();
@@ -2635,12 +2646,10 @@
     // MID-SONG STALL RECOVERY: Detect if audio is supposed to be playing but
     // has stalled mid-stream (e.g. mobile network drop, CPU throttle).
     if (audio.paused) {
-      // Audio paused while isPlaying=true — this is an OS-forced pause
-      // (phone call, headset disconnect, OS media focus lost, etc.)
-      // Try to resume.
+      if (_userExplicitPause) return; // Do not resume if user intentionally paused
       const stallAge = Date.now() - _lastSrcChangedAt;
       if (stallAge > 2000) { // don't interfere with load transitions
-        console.warn(`[Player] Watchdog: audio paused mid-song while isPlaying=true. Attempting resume...`);
+        console.warn('[Player] Watchdog: audio paused unexpectedly while isPlaying=true. Attempting resume...');
         _isTransitioning = true;
         audio.play().then(() => {
           _isTransitioning = false;
@@ -2648,11 +2657,8 @@
           console.log('[Player] Watchdog: mid-song resume succeeded.');
         }).catch(err => {
           _isTransitioning = false;
-          console.warn('[Player] Watchdog: mid-song resume failed:', err.name);
-          if (err.name !== 'NotAllowedError') {
-            setPlayingState(false);
-          }
-          // NotAllowedError = OS blocked it (phone call, etc.) — keep isPlaying=true visually
+          console.warn('[Player] Watchdog: mid-song resume deferred:', err.name);
+          // Do NOT call setPlayingState(false); keep isPlaying=true so next tick or user gesture can resume!
         });
       }
       return;
@@ -2678,25 +2684,6 @@
     if (barBtnPlayPause) barBtnPlayPause.classList.toggle('loading', loading);
     if (fsBtnPlayPause) fsBtnPlayPause.classList.toggle('loading', loading);
   }
-  audio.addEventListener('loadstart', () => { console.log('[Player] Audio: loadstart'); setLoadingState(true); });
-  audio.addEventListener('canplay', () => { console.log('[Player] Audio: canplay \u2014 ready to play'); setLoadingState(false); });
-  audio.addEventListener('canplaythrough', () => setLoadingState(false));
-
-  // MID-SONG STALL DIAGNOSTICS: log when audio buffer stalls or network errors occur
-
-  audio.addEventListener('stalled', () => {
-    console.warn(`[Player] Audio stalled — readyState=${audio.readyState}, networkState=${audio.networkState}, currentTime=${audio.currentTime.toFixed(2)}`);
-    setLoadingState(true);
-  });
-  audio.addEventListener('waiting', () => {
-    console.warn(`[Player] Audio waiting (buffering) — readyState=${audio.readyState}, currentTime=${audio.currentTime.toFixed(2)}`);
-    setLoadingState(true);
-  });
-  audio.addEventListener('suspend', () => {
-    if (isPlaying && !_isTransitioning) {
-      console.warn(`[Player] Audio suspended by browser — readyState=${audio.readyState}, networkState=${audio.networkState}`);
-    }
-  });
 
   // Seekbar Click & Drag
   function handleSeek(e) {
@@ -2963,13 +2950,7 @@
     }
   });
 
-  // Spacebar Play/Pause Shortcut
-  window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-      e.preventDefault();
-      togglePlayPause();
-    }
-  });
+
 
   // Topbar Navigation Buttons
   document.getElementById('btnNavHome').addEventListener('click', () => {
@@ -4196,26 +4177,9 @@
   }
 
   function initMobileAudioUnlock() {
-    const unlock = (e) => {
-      // If user directly tapped a playable element, that gesture directly initiates playback
-      if (e.target && e.target.closest && e.target.closest('.spotify-card, .table-row, .btn-play-pause, .bar-play-btn, #barBtnPlayPause, #mobileBarBtnPlayPause, #fsBtnPlayPause, .mobile-track-row')) {
-        window.removeEventListener('touchstart', unlock, true);
-        window.removeEventListener('click', unlock, true);
-        return;
-      }
-
-      window.removeEventListener('touchstart', unlock, true);
-      window.removeEventListener('click', unlock, true);
-      if (!audio) return;
-      const hasSrc = audio.src && audio.src !== '' && audio.src !== window.location.href;
-      if (hasSrc && audio.paused && !isPlaying && !_isTransitioning) {
-        audio.play().then(() => {
-          if (!isPlaying && !_isTransitioning) audio.pause();
-        }).catch(() => { });
-      }
-    };
-    window.addEventListener('touchstart', unlock, { capture: true, passive: true });
-    window.addEventListener('click', unlock, { capture: true });
+    // Real user clicks on track cards and play buttons naturally unlock audio playback.
+    // Synthetic play/pause cycling is intentionally disabled as it was racing with
+    // track initialization and pausing playback after a few seconds.
   }
 
   // Initialize Mobile Audio Unlock, MediaSession background handlers & Auth Gate
