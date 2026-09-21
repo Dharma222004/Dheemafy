@@ -56,7 +56,7 @@ router.get('/:id', authMiddleware, (req, res) => {
     FROM playlist_tracks pt
     JOIN media_file m ON pt.media_file_id = m.id
     WHERE pt.playlist_id = ?
-    ORDER BY pt.id ASC
+    ORDER BY LOWER(TRIM(m.title)) ASC
   `).all(userId, playlist.id);
 
   res.json({

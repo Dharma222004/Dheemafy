@@ -49,34 +49,12 @@ fun MiniPlayer(
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(6.dp))
-            ) {
-                if (song.resolvedCoverImageUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = song.resolvedCoverImageUrl,
-                        contentDescription = song.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(SpotifyElevated),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = SpotifyGrayText,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
+            SongCoverImage(
+                rawUrl = song.resolvedCoverImageUrl,
+                title = song.title,
+                size = 44.dp,
+                shape = RoundedCornerShape(6.dp)
+            )
 
             Spacer(modifier = Modifier.width(10.dp))
 

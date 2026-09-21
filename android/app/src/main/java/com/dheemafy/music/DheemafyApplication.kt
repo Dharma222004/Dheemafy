@@ -7,8 +7,21 @@ import com.dheemafy.music.data.local.SessionManager
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.decode.SvgDecoder
+
 @UnstableApi
-class DheemafyApplication : Application() {
+class DheemafyApplication : Application(), ImageLoaderFactory {
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .components {
+                add(SvgDecoder.Factory())
+            }
+            .crossfade(true)
+            .build()
+    }
 
     lateinit var sessionManager: SessionManager
         private set

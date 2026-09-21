@@ -53,32 +53,12 @@ fun SongRow(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(4.dp))
-        ) {
-            if (song.resolvedCoverImageUrl.isNotBlank()) {
-                AsyncImage(
-                    model = song.resolvedCoverImageUrl,
-                    contentDescription = song.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = SpotifyGrayText,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
+        SongCoverImage(
+            rawUrl = song.resolvedCoverImageUrl,
+            title = song.title,
+            size = 48.dp,
+            shape = RoundedCornerShape(4.dp)
+        )
 
         Spacer(modifier = Modifier.width(12.dp))
 

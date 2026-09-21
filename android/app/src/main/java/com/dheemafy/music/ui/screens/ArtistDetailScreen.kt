@@ -49,18 +49,20 @@ fun ArtistDetailScreen(
             error = null
             repository.getArtist(artistId).fold(
                 onSuccess = { detail ->
-                    artistDetail = detail
+                    val sortedSongs = detail.songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+                    artistDetail = detail.copy(songs = sortedSongs, songCount = sortedSongs.size)
                     isLoading = false
                 },
                 onFailure = { err ->
                     // Fallback to song search by artist name
                     repository.getSongs(artist = artistName, limit = 100).fold(
                         onSuccess = { songs ->
+                            val sortedSongs = songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
                             artistDetail = ArtistDetail(
                                 id = artistId,
                                 name = artistName,
-                                songCount = songs.size,
-                                songs = songs
+                                songCount = sortedSongs.size,
+                                songs = sortedSongs
                             )
                             isLoading = false
                         },

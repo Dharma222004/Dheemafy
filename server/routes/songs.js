@@ -121,7 +121,7 @@ router.get('/', async (req, res) => {
       EXISTS(SELECT 1 FROM annotation a WHERE a.user_id = ? AND a.item_id = m.id AND a.starred = 1) AS is_liked
     FROM media_file m
     WHERE ${whereSql}
-    ORDER BY m.created_at DESC
+    ORDER BY LOWER(TRIM(m.title)) ASC
     LIMIT ? OFFSET ?
   `).all(...selectParams, limit, offset);
 

@@ -114,30 +114,14 @@ fun NowPlayingScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Large Album Artwork (Primary Visual - NO LYRICS)
-            Box(
+            SongCoverImage(
+                rawUrl = song.resolvedCoverImageUrl,
+                title = song.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(SpotifyElevated),
-                contentAlignment = Alignment.Center
-            ) {
-                if (song.resolvedCoverImageUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = song.resolvedCoverImageUrl,
-                        contentDescription = song.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = SpotifyGrayText,
-                        modifier = Modifier.size(96.dp)
-                    )
-                }
-            }
+                    .aspectRatio(1f),
+                shape = RoundedCornerShape(12.dp)
+            )
 
             Spacer(modifier = Modifier.height(28.dp))
 

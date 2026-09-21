@@ -40,11 +40,13 @@ class MusicRepository(
         }
     }
 
-    suspend fun getSongs(folder: String? = null, artist: String? = null, limit: Int = 100): Result<List<Song>> = withContext(Dispatchers.IO) {
+    suspend fun getSongs(folder: String? = null, artist: String? = null, limit: Int = 500): Result<List<Song>> = withContext(Dispatchers.IO) {
         try {
             val response = apiClient.service.getSongs(folder = folder, artist = artist, limit = limit)
             if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!!)
+                val songs = response.body()!!.data!!
+                val sorted = songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+                Result.success(sorted)
             } else {
                 Result.failure(Exception(response.message() ?: "Failed to load songs"))
             }
@@ -57,7 +59,9 @@ class MusicRepository(
         try {
             val response = apiClient.service.getPlaylist(id)
             if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!!)
+                val detail = response.body()!!.data!!
+                val sortedTracks = detail.tracks.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+                Result.success(detail.copy(tracks = sortedTracks))
             } else {
                 Result.failure(Exception(response.message() ?: "Failed to load playlist"))
             }

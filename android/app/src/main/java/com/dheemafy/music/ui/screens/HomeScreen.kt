@@ -1,19 +1,27 @@
 package com.dheemafy.music.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dheemafy.music.R
 import com.dheemafy.music.data.local.SessionManager
 import com.dheemafy.music.data.model.HomeData
 import com.dheemafy.music.data.model.Song
@@ -41,6 +49,7 @@ fun HomeScreen(
     var homeData by remember { mutableStateOf<HomeData?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showProfileDialog by remember { mutableStateOf(false) }
 
     val user = sessionManager.currentUser.collectAsState().value
     val greeting = remember {
@@ -71,6 +80,89 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         loadData()
+    }
+
+    // Profile & Logout Dialog
+    if (showProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showProfileDialog = false },
+            containerColor = SpotifyCard,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(SpotifyGreen),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = (user?.name ?: user?.userName ?: "U").take(1).uppercase(),
+                            color = SpotifyBlack,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = user?.name ?: "User",
+                            color = SpotifyWhite,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "@${user?.userName ?: "user"}",
+                            color = SpotifyGrayText,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Connected Backend:",
+                        color = SpotifySubtleGray,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = sessionManager.getBaseUrl(),
+                        color = SpotifyGreenBright,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showProfileDialog = false
+                        repository.logout()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SpotifyError,
+                        contentColor = SpotifyWhite
+                    ),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = "Log Out",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Log out", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProfileDialog = false }) {
+                    Text("Cancel", color = SpotifyGrayText)
+                }
+            }
+        )
     }
 
     Box(
@@ -108,17 +200,62 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 120.dp)
             ) {
+                // Top Brand Bar + User Avatar
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.dheemafy_logo),
+                            contentDescription = "Dheemafy Logo",
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Dheemafy",
+                            color = SpotifyWhite,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // User Avatar button for Profile & Logout
+                        val initial = (user?.name ?: user?.userName ?: "U").take(1).uppercase()
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SpotifyGreen)
+                                .clickable { showProfileDialog = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = initial,
+                                color = SpotifyBlack,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
                 // Header Greeting
                 item {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)
+                            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
                     ) {
                         Text(
                             text = "$greeting, ${user?.name ?: "Sharu"}",
                             color = SpotifyWhite,
-                            fontSize = 24.sp,
+                            fontSize = 26.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -140,7 +277,8 @@ fun HomeScreen(
                             items(data.featuredPlaylists) { playlist ->
                                 PlaylistItemCard(
                                     playlist = playlist,
-                                    onClick = { onPlaylistClick(playlist.id, playlist.name) }
+                                    onClick = { onPlaylistClick(playlist.id, playlist.name) },
+                                    baseUrl = sessionManager.getBaseUrl()
                                 )
                             }
                         }

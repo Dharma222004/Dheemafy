@@ -1,8 +1,13 @@
 package com.dheemafy.music.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import com.dheemafy.music.R
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -55,12 +60,12 @@ fun LoginScreen(
                 .padding(horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.GraphicEq,
+            Image(
+                painter = painterResource(id = R.drawable.dheemafy_logo),
                 contentDescription = "Dheemafy Logo",
-                tint = SpotifyGreen,
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
             )
 
             Spacer(modifier = Modifier.height(16.dp))

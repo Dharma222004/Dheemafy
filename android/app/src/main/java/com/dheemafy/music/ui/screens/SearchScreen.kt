@@ -141,7 +141,7 @@ fun SearchScreen(
                 }
             } else {
                 val data = searchData
-                val songs = data?.songs ?: emptyList()
+                val songs = remember(data) { (data?.songs ?: emptyList()).sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() }) }
                 val artists = data?.artists ?: emptyList()
 
                 if (songs.isEmpty() && artists.isEmpty()) {

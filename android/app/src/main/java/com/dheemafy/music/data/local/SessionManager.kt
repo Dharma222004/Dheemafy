@@ -61,7 +61,11 @@ class SessionManager(context: Context) {
     }
 
     fun getBaseUrl(): String {
-        return prefs.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        val saved = prefs.getString(KEY_BASE_URL, null)
+        if (saved.isNullOrBlank() || saved == "http://10.0.2.2:4534/") {
+            return DEFAULT_BASE_URL
+        }
+        return saved
     }
 
     fun saveBaseUrl(url: String) {
@@ -87,7 +91,6 @@ class SessionManager(context: Context) {
         private const val KEY_USER = "current_user"
         private const val KEY_BASE_URL = "base_server_url"
 
-        // Default to local/emulator server or can be customized by the user in the login screen
-        const val DEFAULT_BASE_URL = "http://10.0.2.2:4534/"
+        const val DEFAULT_BASE_URL = "https://dheemafy.vercel.app/"
     }
 }

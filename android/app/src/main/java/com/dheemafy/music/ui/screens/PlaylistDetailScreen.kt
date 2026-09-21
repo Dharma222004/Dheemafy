@@ -20,12 +20,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.dheemafy.music.data.model.PlaylistDetail
 import com.dheemafy.music.data.model.Song
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.playback.PlaybackState
+import com.dheemafy.music.ui.components.PlaylistFallbackCard
 import com.dheemafy.music.ui.components.SongRow
 import com.dheemafy.music.ui.theme.*
 import kotlinx.coroutines.launch
@@ -52,16 +53,20 @@ fun PlaylistDetailScreen(
             // Check if it's "All Songs" folder or standard playlist ID
             val result = if (playlistId.equals("all-songs", ignoreCase = true) || playlistName.equals("All Songs", ignoreCase = true)) {
                 repository.getSongs(folder = null, limit = 500).map { songs ->
+                    val sortedSongs = songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
                     PlaylistDetail(
                         id = "all-songs",
                         name = "All Songs",
                         comment = "Complete music library catalog",
-                        songCount = songs.size,
-                        tracks = songs
+                        songCount = sortedSongs.size,
+                        tracks = sortedSongs
                     )
                 }
             } else {
-                repository.getPlaylist(playlistId)
+                repository.getPlaylist(playlistId).map { detail ->
+                    val sortedTracks = detail.tracks.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+                    detail.copy(tracks = sortedTracks, songCount = sortedTracks.size)
+                }
             }
 
             result.fold(
@@ -73,12 +78,13 @@ fun PlaylistDetailScreen(
                     // Fallback to songs route with folder param if playlist lookup fails
                     repository.getSongs(folder = playlistName, limit = 500).fold(
                         onSuccess = { folderSongs ->
+                            val sortedFolderSongs = folderSongs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
                             playlistDetail = PlaylistDetail(
                                 id = playlistId,
                                 name = playlistName,
                                 comment = "Curated playlist",
-                                songCount = folderSongs.size,
-                                tracks = folderSongs
+                                songCount = sortedFolderSongs.size,
+                                tracks = sortedFolderSongs
                             )
                             isLoading = false
                         },
@@ -94,6 +100,15 @@ fun PlaylistDetailScreen(
 
     LaunchedEffect(playlistId) {
         loadPlaylist()
+    }
+
+    val headerGradientColors = remember(playlistName) {
+        when {
+            playlistName.contains("sharu", ignoreCase = true) -> listOf(Color(0xFF581C87), SpotifyBlack)
+            playlistName.contains("hills", ignoreCase = true) -> listOf(Color(0xFF065F46), SpotifyBlack)
+            playlistName.contains("all", ignoreCase = true) -> listOf(Color(0xFF1E3A8A), SpotifyBlack)
+            else -> listOf(Color(0xFF2E4B37), SpotifyBlack)
+        }
     }
 
     Box(
@@ -135,54 +150,61 @@ fun PlaylistDetailScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFF2E4B37),
-                                        SpotifyBlack
-                                    )
-                                )
-                            )
+                            .background(Brush.verticalGradient(colors = headerGradientColors))
                             .padding(16.dp)
                     ) {
-                        IconButton(
-                            onClick = onBackClick,
-                            modifier = Modifier.align(Alignment.TopStart)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = SpotifyWhite
-                            )
-                        }
+                        Column {
+                            IconButton(
+                                onClick = onBackClick,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = SpotifyWhite
+                                )
+                            }
 
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(bottom = 8.dp)
-                        ) {
-                            Text(
-                                text = "PLAYLIST",
-                                color = SpotifyGrayText,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = detail.name,
-                                color = SpotifyWhite,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            val trackCount = detail.songCount ?: tracks.size
-                            Text(
-                                text = "$trackCount songs • Isolated Queue",
-                                color = SpotifyGrayText,
-                                fontSize = 13.sp
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(110.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                ) {
+                                    PlaylistFallbackCard(name = detail.name)
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Column {
+                                    Text(
+                                        text = "PLAYLIST",
+                                        color = SpotifyGrayText,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = detail.name,
+                                        color = SpotifyWhite,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    val trackCount = detail.songCount ?: tracks.size
+                                    Text(
+                                        text = "$trackCount songs • Alphabetical",
+                                        color = SpotifyGrayText,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -239,7 +261,7 @@ fun PlaylistDetailScreen(
                     }
                 }
 
-                // Track List
+                // Track List (Sorted Alphabetically A-Z)
                 itemsIndexed(tracks) { index, song ->
                     val isCurrent = playbackState.currentSong?.id == song.id
                     SongRow(
