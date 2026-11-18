@@ -1906,10 +1906,202 @@
     mainScrollView.scrollTop = 0;
   }
 
+  // Search Focus / Click: Immediately switch to search view
+  searchInput.addEventListener('focus', () => {
+    if (currentRoute !== 'search') openSearchView();
+  });
+  searchInput.addEventListener('click', () => {
+    if (currentRoute !== 'search') openSearchView();
+  });
+
+  function searchLocalSongs(query) {
+    if (!query) return [];
+    const q = query.toLowerCase().trim();
+    const tokens = q.split(/\s+/).filter(Boolean);
+
+    return allSongs.filter(s => {
+      const title = (s.title || '').toLowerCase();
+      const artist = (s.artist || '').toLowerCase();
+      const album = (s.album || '').toLowerCase();
+      const movie = (s.movie || '').toLowerCase();
+      const folder = (s.folder || '').toLowerCase();
+      let artArr = [];
+      if (Array.isArray(s.artists)) artArr = s.artists.map(a => a.toLowerCase());
+      else {
+        try { artArr = JSON.parse(s.artists_json || '[]').map(a => a.toLowerCase()); } catch (_) {}
+      }
+      const fullText = `${title} ${artist} ${album} ${movie} ${folder} ${artArr.join(' ')}`;
+      return tokens.every(token => fullText.includes(token));
+    }).sort((a, b) => {
+      const titleA = (a.title || '').toLowerCase();
+      const titleB = (b.title || '').toLowerCase();
+      if (titleA === q) return -1;
+      if (titleB === q) return 1;
+      if (titleA.startsWith(q) && !titleB.startsWith(q)) return -1;
+      if (!titleA.startsWith(q) && titleB.startsWith(q)) return 1;
+      return titleA.localeCompare(titleB, undefined, { sensitivity: 'base', numeric: true });
+    });
+  }
+
+  function searchLocalArtists(query) {
+    if (!query) return [];
+    const q = query.toLowerCase().trim();
+    return KNOWN_MUSIC_DIRECTORS.filter(dir => {
+      const name = dir.name.toLowerCase();
+      const aliases = (dir.aliases || []).map(a => a.toLowerCase());
+      return name.includes(q) || aliases.some(a => a.includes(q));
+    }).map(dir => {
+      const songs = getDirectorSongs(dir, allSongs);
+      return {
+        name: dir.name,
+        slug: dir.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        large_image_url: dir.cover,
+        song_count: songs.length
+      };
+    });
+  }
+
+  function renderSearchResultsUI(songs, artists, rawQuery) {
+    if (songs.length === 0 && artists.length === 0) {
+      topResultCard.innerHTML = `<p style="color: #b3b3b3; padding: 24px;">No results found for "${rawQuery}"</p>`;
+      searchMiniRows.innerHTML = '';
+      searchTableRows.innerHTML = '';
+      return;
+    }
+
+    // Top Result determination
+    const queryLower = rawQuery.toLowerCase();
+    const matchedArtist = artists.find(a => a.name.toLowerCase() === queryLower) || artists[0];
+    const isArtistTop = matchedArtist && (!songs[0] || songs[0].title.toLowerCase() !== queryLower);
+
+    if (isArtistTop && matchedArtist) {
+      topResultCard.innerHTML = `
+        <img class="top-result-img" style="border-radius: 50%;" src="${matchedArtist.large_image_url || DEFAULT_SONG_COVER}" alt="${matchedArtist.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
+        <h2 class="top-result-title">${matchedArtist.name}</h2>
+        <p class="top-result-sub">Artist • ${matchedArtist.song_count || songs.length} songs</p>
+        <span class="top-result-badge">Artist</span>
+        <button class="card-play-btn" style="opacity: 1; transform: none; right: 20px; bottom: 20px;" title="View ${matchedArtist.name}">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+      `;
+      topResultCard.onclick = () => openArtistView(matchedArtist.slug || matchedArtist.name);
+    } else if (songs.length > 0) {
+      const top = songs[0];
+      topResultCard.innerHTML = `
+        <img class="top-result-img" src="${top.cover_image_url || DEFAULT_SONG_COVER}" alt="${top.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
+        <h2 class="top-result-title">${top.title}</h2>
+        <p class="top-result-sub">${top.artist} • <span style="color:#fff;">${top.movie ? `From "${top.movie}"` : (top.album || 'Single')}</span></p>
+        <span class="top-result-badge">Song</span>
+        <button class="card-play-btn" style="opacity: 1; transform: none; right: 20px; bottom: 20px;" title="Play ${top.title}">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+      `;
+      topResultCard.onclick = () => playTrackById(top.id, songs);
+    }
+
+    // Mini rows (top 4)
+    searchMiniRows.innerHTML = songs.slice(0, 4).map((s, idx) => `
+      <div class="table-row ${currentSong && currentSong.id === s.id ? 'playing' : ''}" data-song-id="${s.id}" data-index="${idx}">
+        <div class="row-title-col">
+          <img class="row-thumb" src="${s.cover_image_url || DEFAULT_SONG_COVER}" alt="${s.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
+          <div class="row-text">
+            <span class="row-song-title">${s.title}</span>
+            <span class="row-artist-name">${renderArtistLinksHtml(s)}</span>
+          </div>
+        </div>
+        <div class="row-time-col">
+          <span class="row-dur-span" data-song-id="${s.id}">${formatDuration(s.duration)}</span>
+          <button class="row-add-pl-btn" data-id="${s.id}" title="Add to playlist">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    searchMiniRows.querySelectorAll('.table-row').forEach(r => {
+      r.addEventListener('click', (e) => {
+        if (e.target.closest('.artist-link-item') || e.target.closest('.row-add-pl-btn')) return;
+        const id = r.getAttribute('data-song-id');
+        playTrackById(id, songs);
+      });
+    });
+    searchMiniRows.querySelectorAll('.row-add-pl-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const song = allSongs.find(s => s.id === id);
+        if (song) openAddToPlaylistPicker(song);
+      });
+    });
+    attachArtistLinkListeners(searchMiniRows);
+
+    // Full table: Render all matching songs in order
+    searchTableRows.innerHTML = songs.map((song, idx) => `
+      <div class="table-row ${currentSong && currentSong.id === song.id ? 'playing' : ''}" data-song-id="${song.id}" data-index="${idx}">
+        <div class="row-num"><span class="row-index-num">${idx + 1}</span></div>
+        <div class="row-title-col">
+          <img class="row-thumb" src="${song.cover_image_url || DEFAULT_SONG_COVER}" alt="${song.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
+          <div class="row-text">
+            <span class="row-song-title">${song.title}</span>
+            <span class="row-artist-name">${renderArtistLinksHtml(song)}</span>
+          </div>
+        </div>
+        <div class="row-album-col">${song.movie ? `From "${song.movie}"` : (song.album || 'Single')}</div>
+        <div class="row-date-col">${song.language || 'Master'}</div>
+        <div class="row-time-col">
+          <button class="row-heart-btn ${song.is_liked ? 'liked' : ''}" data-id="${song.id}" title="${song.is_liked ? 'Unlike' : 'Like'}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="${song.is_liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+          </button>
+          <span class="row-dur-span" data-song-id="${song.id}">${formatDuration(song.duration)}</span>
+          <button class="row-add-pl-btn" data-id="${song.id}" title="Add to playlist">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    searchTableRows.querySelectorAll('.table-row').forEach(r => {
+      r.addEventListener('click', (e) => {
+        if (e.target.closest('.artist-link-item') || e.target.closest('.row-heart-btn') || e.target.closest('.row-add-pl-btn')) return;
+        const id = r.getAttribute('data-song-id');
+        playTrackById(id, songs);
+      });
+    });
+
+    searchTableRows.querySelectorAll('.row-heart-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        await toggleLikeSong(id);
+      });
+    });
+
+    searchTableRows.querySelectorAll('.row-add-pl-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const song = allSongs.find(s => s.id === id);
+        if (song) openAddToPlaylistPicker(song);
+      });
+    });
+
+    attachArtistLinkListeners(searchTableRows);
+  }
+
   let searchDebounce = null;
   searchInput.addEventListener('input', () => {
     const rawQuery = (searchInput.value || '').trim();
     btnClearSearch.classList.toggle('hidden', !rawQuery);
+
+    if (currentRoute !== 'search') {
+      openSearchView();
+    }
 
     if (!rawQuery) {
       searchBrowseTiles.classList.remove('hidden');
@@ -1920,149 +2112,43 @@
     searchBrowseTiles.classList.add('hidden');
     searchResultsSection.classList.remove('hidden');
 
+    // 1. Instant local search across full 591 catalog (0ms latency)
+    const localSongs = searchLocalSongs(rawQuery);
+    const localArtists = searchLocalArtists(rawQuery);
+    renderSearchResultsUI(localSongs, localArtists, rawQuery);
+
+    // 2. Debounced background fetch to /api/search to enrich / update
     clearTimeout(searchDebounce);
     searchDebounce = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(rawQuery)}`);
+        if (!res.ok) return;
         const json = await res.json();
         const results = (json && json.data) || { songs: [], artists: [] };
-        const songs = results.songs || [];
-        const artists = results.artists || [];
+        // Check if query is still the current input value
+        if ((searchInput.value || '').trim() !== rawQuery) return;
 
-        if (songs.length === 0 && artists.length === 0) {
-          topResultCard.innerHTML = `<p style="color: #b3b3b3; padding: 24px;">No results found for "${rawQuery}"</p>`;
-          searchMiniRows.innerHTML = '';
-          searchTableRows.innerHTML = '';
-          return;
-        }
+        // Merge: keep local songs as base and enrich with any server artists/albums
+        const serverSongs = results.songs || [];
+        const mergedSongs = serverSongs.length > 0 ? serverSongs : localSongs;
+        const serverArtists = results.artists || [];
+        const mergedArtists = serverArtists.length > 0 ? serverArtists : localArtists;
 
-        // Top Result determination
-        const queryLower = rawQuery.toLowerCase();
-        const matchedArtist = artists.find(a => a.name.toLowerCase() === queryLower) || artists[0];
-        const isArtistTop = matchedArtist && (!songs[0] || songs[0].title.toLowerCase() !== queryLower);
-
-        if (isArtistTop && matchedArtist) {
-          topResultCard.innerHTML = `
-            <img class="top-result-img" style="border-radius: 50%;" src="${matchedArtist.large_image_url || DEFAULT_SONG_COVER}" alt="${matchedArtist.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
-            <h2 class="top-result-title">${matchedArtist.name}</h2>
-            <p class="top-result-sub">Artist • ${matchedArtist.song_count || songs.length} songs</p>
-            <span class="top-result-badge">Artist</span>
-            <button class="card-play-btn" style="opacity: 1; transform: none; right: 20px; bottom: 20px;" title="View ${matchedArtist.name}">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-          `;
-          topResultCard.onclick = () => openArtistView(matchedArtist.slug || matchedArtist.name);
-        } else if (songs.length > 0) {
-          const top = songs[0];
-          topResultCard.innerHTML = `
-            <img class="top-result-img" src="${top.cover_image_url || DEFAULT_SONG_COVER}" alt="${top.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
-            <h2 class="top-result-title">${top.title}</h2>
-            <p class="top-result-sub">${top.artist} • <span style="color:#fff;">${top.movie ? `From "${top.movie}"` : (top.album || 'Single')}</span></p>
-            <span class="top-result-badge">Song</span>
-            <button class="card-play-btn" style="opacity: 1; transform: none; right: 20px; bottom: 20px;" title="Play ${top.title}">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-          `;
-          topResultCard.onclick = () => playTrackById(top.id, songs);
-        }
-
-        // Mini rows (top 4)
-        searchMiniRows.innerHTML = songs.slice(0, 4).map((s, idx) => `
-          <div class="table-row ${currentSong && currentSong.id === s.id ? 'playing' : ''}" data-song-id="${s.id}" data-index="${idx}">
-            <div class="row-title-col">
-              <img class="row-thumb" src="${s.cover_image_url || DEFAULT_SONG_COVER}" alt="${s.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
-              <div class="row-text">
-                <span class="row-song-title">${s.title}</span>
-                <span class="row-artist-name">${renderArtistLinksHtml(s)}</span>
-              </div>
-            </div>
-            <div class="row-time-col">
-              <span class="row-dur-span" data-song-id="${s.id}">${formatDuration(s.duration)}</span>
-              <button class="row-add-pl-btn" data-id="${s.id}" title="Add to playlist">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        `).join('');
-
-        searchMiniRows.querySelectorAll('.table-row').forEach(r => {
-          r.addEventListener('click', (e) => {
-            if (e.target.closest('.artist-link-item') || e.target.closest('.row-add-pl-btn')) return;
-            const id = r.getAttribute('data-song-id');
-            playTrackById(id, songs);
-          });
-        });
-        searchMiniRows.querySelectorAll('.row-add-pl-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = btn.getAttribute('data-id');
-            const song = allSongs.find(s => s.id === id);
-            if (song) openAddToPlaylistPicker(song);
-          });
-        });
-        attachArtistLinkListeners(searchMiniRows);
-
-        // Full table: Render all matching songs in order
-        searchTableRows.innerHTML = songs.map((song, idx) => `
-          <div class="table-row ${currentSong && currentSong.id === song.id ? 'playing' : ''}" data-song-id="${song.id}" data-index="${idx}">
-            <div class="row-num"><span class="row-index-num">${idx + 1}</span></div>
-            <div class="row-title-col">
-              <img class="row-thumb" src="${song.cover_image_url || DEFAULT_SONG_COVER}" alt="${song.title}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
-              <div class="row-text">
-                <span class="row-song-title">${song.title}</span>
-                <span class="row-artist-name">${renderArtistLinksHtml(song)}</span>
-              </div>
-            </div>
-            <div class="row-album-col">${song.movie ? `From "${song.movie}"` : (song.album || 'Single')}</div>
-            <div class="row-date-col">${song.language || 'Master'}</div>
-            <div class="row-time-col">
-              <button class="row-heart-btn ${song.is_liked ? 'liked' : ''}" data-id="${song.id}" title="${song.is_liked ? 'Unlike' : 'Like'}">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="${song.is_liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </svg>
-              </button>
-              <span class="row-dur-span" data-song-id="${song.id}">${formatDuration(song.duration)}</span>
-              <button class="row-add-pl-btn" data-id="${song.id}" title="Add to playlist">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        `).join('');
-
-        searchTableRows.querySelectorAll('.table-row').forEach(r => {
-          r.addEventListener('click', (e) => {
-            if (e.target.closest('.artist-link-item') || e.target.closest('.row-heart-btn') || e.target.closest('.row-add-pl-btn')) return;
-            const id = r.getAttribute('data-song-id');
-            playTrackById(id, songs);
-          });
-        });
-
-        searchTableRows.querySelectorAll('.row-heart-btn').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = btn.getAttribute('data-id');
-            await toggleLikeSong(id);
-          });
-        });
-
-        searchTableRows.querySelectorAll('.row-add-pl-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = btn.getAttribute('data-id');
-            const song = allSongs.find(s => s.id === id);
-            if (song) openAddToPlaylistPicker(song);
-          });
-        });
-
-        attachArtistLinkListeners(searchTableRows);
+        renderSearchResultsUI(mergedSongs, mergedArtists, rawQuery);
       } catch (err) {
-        console.error('Search error:', err);
+        console.warn('Background search fetch note:', err.message);
       }
-    }, 150);
+    }, 180);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      btnClearSearch.classList.add('hidden');
+      searchBrowseTiles.classList.remove('hidden');
+      searchResultsSection.classList.add('hidden');
+      searchInput.blur();
+    }
   });
 
   btnClearSearch.addEventListener('click', () => {

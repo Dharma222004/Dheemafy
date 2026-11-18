@@ -28,31 +28,39 @@ router.get('/', async (req, res) => {
     const cleanQuery = query.replace(/['\"*]/g, '').trim();
     const likePattern = `%${cleanQuery}%`;
 
-    // --- 1. Search songs in Cloudinary in-memory cache ---
-    const allSongs = cloudinaryDirect.getInMemorySongs();
-    let songs = allSongs
-      .filter(s =>
-        s.title.toLowerCase().includes(q) ||
-        s.artist.toLowerCase().includes(q) ||
-        (s.album && s.album.toLowerCase().includes(q)) ||
-        (s.movie && s.movie.toLowerCase().includes(q))
-      )
-      .slice(0, 40);
-
-    // If in-memory cache is empty, trigger a fresh fetch and retry
-    if (songs.length === 0 && allSongs.length === 0) {
+    // --- 1. Search songs in Cloudinary direct cache ---
+    let allSongs = cloudinaryDirect.getInMemorySongs();
+    if (allSongs.length === 0) {
       try {
-        const freshSongs = await cloudinaryDirect.getCachedSongs(false, 'Songs');
-        songs = freshSongs
-          .filter(s =>
-            s.title.toLowerCase().includes(q) ||
-            s.artist.toLowerCase().includes(q) ||
-            (s.album && s.album.toLowerCase().includes(q)) ||
-            (s.movie && s.movie.toLowerCase().includes(q))
-          )
-          .slice(0, 40);
-      } catch (_) { /* fall through with empty */ }
+        allSongs = await cloudinaryDirect.getCachedSongs(false);
+      } catch (_) {
+        allSongs = [];
+      }
     }
+
+    const tokens = q.split(/\s+/).filter(Boolean);
+    let songs = allSongs.filter(s => {
+      const title = (s.title || '').toLowerCase();
+      const artist = (s.artist || '').toLowerCase();
+      const album = (s.album || '').toLowerCase();
+      const movie = (s.movie || '').toLowerCase();
+      const folder = (s.folder || '').toLowerCase();
+      let artArr = [];
+      if (Array.isArray(s.artists)) artArr = s.artists.map(a => a.toLowerCase());
+      else {
+        try { artArr = JSON.parse(s.artists_json || '[]').map(a => a.toLowerCase()); } catch (_) {}
+      }
+      const fullText = `${title} ${artist} ${album} ${movie} ${folder} ${artArr.join(' ')}`;
+      return tokens.every(token => fullText.includes(token));
+    }).sort((a, b) => {
+      const titleA = (a.title || '').toLowerCase();
+      const titleB = (b.title || '').toLowerCase();
+      if (titleA === q) return -1;
+      if (titleB === q) return 1;
+      if (titleA.startsWith(q) && !titleB.startsWith(q)) return -1;
+      if (!titleA.startsWith(q) && titleB.startsWith(q)) return 1;
+      return titleA.localeCompare(titleB, undefined, { sensitivity: 'base', numeric: true });
+    }).slice(0, 100);
 
     // Enrich is_liked from SQLite
     let likedSet = new Set();
