@@ -11,6 +11,100 @@
   let allSongs = [];
   let homeData = null;
 
+  // =========================================================================
+  // USER PLAYLIST MANAGER (localStorage-backed, persistent across sessions)
+  // =========================================================================
+  const UserPlaylistManager = (() => {
+    const STORAGE_KEY = 'dheemafy_user_playlists';
+
+    function _load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (_) { return []; }
+    }
+
+    function _save(playlists) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(playlists));
+      } catch (e) {
+        console.warn('[UserPL] Save error:', e.message);
+      }
+    }
+
+    function getAll() { return _load(); }
+
+    function getById(plId) {
+      return _load().find(p => p.id === plId) || null;
+    }
+
+    function create(name) {
+      const pls = _load();
+      const id = 'upl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      const newPl = {
+        id,
+        name: (name || 'My Playlist').trim(),
+        songIds: [],
+        createdAt: new Date().toISOString()
+      };
+      pls.unshift(newPl); // newest first
+      _save(pls);
+      return newPl;
+    }
+
+    function rename(plId, newName) {
+      const pls = _load();
+      const pl = pls.find(p => p.id === plId);
+      if (pl) { pl.name = (newName || pl.name).trim(); _save(pls); }
+    }
+
+    function deletePl(plId) {
+      const pls = _load().filter(p => p.id !== plId);
+      _save(pls);
+    }
+
+    function addSong(plId, songId) {
+      const pls = _load();
+      const pl = pls.find(p => p.id === plId);
+      if (!pl) return false;
+      if (pl.songIds.includes(songId)) return false; // already in
+      pl.songIds.push(songId);
+      _save(pls);
+      return true;
+    }
+
+    function removeSong(plId, songId) {
+      const pls = _load();
+      const pl = pls.find(p => p.id === plId);
+      if (!pl) return false;
+      const idx = pl.songIds.indexOf(songId);
+      if (idx === -1) return false;
+      pl.songIds.splice(idx, 1);
+      _save(pls);
+      return true;
+    }
+
+    function hasSong(plId, songId) {
+      const pl = getById(plId);
+      return pl ? pl.songIds.includes(songId) : false;
+    }
+
+    /** Resolve songIds to full song objects from allSongs, preserving order */
+    function getSongs(plId) {
+      const pl = getById(plId);
+      if (!pl) return [];
+      const songMap = {};
+      allSongs.forEach(s => { songMap[s.id] = s; });
+      return pl.songIds.map(id => songMap[id]).filter(Boolean);
+    }
+
+    return { getAll, getById, create, rename, deletePl, addSong, removeSong, hasSong, getSongs };
+  })();
+  window.UserPlaylistManager = UserPlaylistManager;
+
+  // Track which user playlist is currently being viewed (for remove-from-playlist)
+  let _activeUserPlaylistId = null;
+
   // currentPlaylist = the playlist currently being BROWSED (shown in playlist view / row highlighting)
   // activePlaybackPlaylist = the playlist actually DRIVING PLAYBACK (next/prev/auto-advance)
   // These are kept separate so that browsing a new playlist does not hijack the active queue.
@@ -1494,9 +1588,10 @@
   // ==========================================================================
   // PLAYLIST / TRACK TABLE VIEW
   // ==========================================================================
-  function openPlaylistView(title, desc, coverUrl, trackList) {
+  function openPlaylistView(title, desc, coverUrl, trackList, userPlaylistId) {
     const uniqueTrackList = deduplicateSongList(trackList);
-    // FIX-2: Only update the BROWSING context here.
+    // Track which user playlist is active (for remove-from-playlist and add-songs)
+    _activeUserPlaylistId = userPlaylistId || null;
     // The active playback queue (activePlaybackPlaylist) is ONLY replaced when the user
     // explicitly presses Play / Play All on this playlist — NOT by merely opening it.
     currentPlaylist = uniqueTrackList;
@@ -1525,7 +1620,8 @@
     mainScrollView.scrollTop = 0;
   }
 
-  function renderTrackTableRows(tracks) {
+  function renderTrackTableRows(tracks, userPlId) {
+    const isUserPl = !!userPlId || !!_activeUserPlaylistId;
     playlistTrackRows.innerHTML = tracks.map((song, idx) => {
       const isCurrent = currentTrackIndex >= 0 && currentPlaylist[currentTrackIndex] && currentPlaylist[currentTrackIndex].id === song.id;
       const rowClass = `table-row ${isCurrent ? 'playing' : ''}`;
@@ -1560,6 +1656,9 @@
               </svg>
             </button>
             <span class="row-dur-span" data-song-id="${song.id}">${formatDuration(song.duration)}</span>
+            ${isUserPl ? `<button class="row-remove-btn" data-id="${song.id}" title="Remove from playlist">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+            </button>` : ''}
           </div>
         </div>
       `;
@@ -1567,7 +1666,7 @@
 
     playlistTrackRows.querySelectorAll('.table-row').forEach(row => {
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.row-heart-btn') || e.target.closest('.artist-link-item')) return;
+        if (e.target.closest('.row-heart-btn') || e.target.closest('.artist-link-item') || e.target.closest('.row-remove-btn')) return;
         const index = parseInt(row.getAttribute('data-index'), 10);
         // FIX-2: Clicking a row commits the browsing playlist to the active playback queue
         const isAlreadyActivePlaylist = (activePlaybackPlaylist === currentPlaylist ||
@@ -1593,6 +1692,25 @@
         e.stopPropagation();
         const id = btn.getAttribute('data-id');
         await toggleLikeSong(id);
+      });
+    });
+
+    // User playlist: remove song from playlist button
+    playlistTrackRows.querySelectorAll('.row-remove-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const songId = btn.getAttribute('data-id');
+        const plId = userPlId || _activeUserPlaylistId;
+        if (plId && songId) {
+          const song = allSongs.find(s => s.id === songId);
+          UserPlaylistManager.removeSong(plId, songId);
+          showToast(`Removed "${song ? song.title : 'song'}" from playlist`);
+          const refreshedSongs = UserPlaylistManager.getSongs(plId);
+          currentPlaylist = refreshedSongs;
+          renderTrackTableRows(refreshedSongs, plId);
+          if (playlistTrackCount) playlistTrackCount.textContent = `${refreshedSongs.length} songs`;
+          renderSidebarPlaylists();
+        }
       });
     });
 
@@ -3833,9 +3951,7 @@
   if (btnCreateNewPlaylist) {
     btnCreateNewPlaylist.addEventListener('click', () => {
       closeCreateSheet();
-      const pName = prompt('Enter playlist name:', 'My Playlist #1') || 'My Playlist #1';
-      openPlaylistView(pName, `Created by sharu • 0 songs`, 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600', []);
-      showToast(`Created playlist "${pName}"`);
+      openCreatePlaylistModal();
     });
   }
   if (btnCreateBlend) {
@@ -3858,9 +3974,9 @@
   if (btnContextAddToPlaylist) {
     btnContextAddToPlaylist.addEventListener('click', () => {
       if (currentContextSong) {
-        showToast(`Added "${currentContextSong.title}" to Your Library`);
+        closeTrackContextSheet();
+        openAddToPlaylistPicker(currentContextSong);
       }
-      closeTrackContextSheet();
     });
   }
   if (btnContextViewArtist) {
@@ -4432,6 +4548,494 @@
       // Small delay so the browser has time to update the device list
       setTimeout(detectAudioOutput, 300);
     });
+  }
+
+  // ==========================================================================
+  // USER PLAYLIST UI SYSTEM
+  // ==========================================================================
+
+  // --- Create Playlist Modal ---
+  const createPlaylistModal = document.getElementById('createPlaylistModal');
+  const createPlaylistNameInput = document.getElementById('createPlaylistNameInput');
+  const btnCancelCreatePlaylist = document.getElementById('btnCancelCreatePlaylist');
+  const btnConfirmCreatePlaylist = document.getElementById('btnConfirmCreatePlaylist');
+
+  function openCreatePlaylistModal(prefillName) {
+    if (!createPlaylistModal) return;
+    createPlaylistModal.classList.remove('hidden');
+    if (createPlaylistNameInput) {
+      createPlaylistNameInput.value = prefillName || '';
+      setTimeout(() => createPlaylistNameInput.focus(), 100);
+    }
+  }
+
+  function closeCreatePlaylistModal() {
+    if (createPlaylistModal) createPlaylistModal.classList.add('hidden');
+  }
+
+  if (btnCancelCreatePlaylist) btnCancelCreatePlaylist.addEventListener('click', closeCreatePlaylistModal);
+  if (createPlaylistModal) {
+    createPlaylistModal.addEventListener('click', (e) => {
+      if (e.target === createPlaylistModal) closeCreatePlaylistModal();
+    });
+  }
+
+  if (btnConfirmCreatePlaylist) {
+    btnConfirmCreatePlaylist.addEventListener('click', () => {
+      const name = (createPlaylistNameInput ? createPlaylistNameInput.value : '').trim();
+      if (!name) {
+        showToast('Please enter a playlist name');
+        if (createPlaylistNameInput) createPlaylistNameInput.focus();
+        return;
+      }
+      const newPl = UserPlaylistManager.create(name);
+      closeCreatePlaylistModal();
+      showToast(`Created playlist "${newPl.name}"`);
+      renderSidebarPlaylists();
+      renderHomeView();
+      // Open the new empty playlist
+      _activeUserPlaylistId = newPl.id;
+      openPlaylistView(newPl.name, `Playlist • 0 songs`, null, [], newPl.id);
+    });
+  }
+
+  if (createPlaylistNameInput) {
+    createPlaylistNameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (btnConfirmCreatePlaylist) btnConfirmCreatePlaylist.click();
+      }
+    });
+  }
+
+  // --- Add to Playlist Picker ---
+  const addToPlaylistSheet = document.getElementById('addToPlaylistSheet');
+  const addToPlaylistSheetBackdrop = document.getElementById('addToPlaylistSheetBackdrop');
+  const btnCloseAddToPlaylistSheet = document.getElementById('btnCloseAddToPlaylistSheet');
+  const addToPlaylistList = document.getElementById('addToPlaylistList');
+  const addToPlSearchInput = document.getElementById('addToPlSearchInput');
+  const btnNewPlaylistFromPicker = document.getElementById('btnNewPlaylistFromPicker');
+  let _addToPlaylistSong = null;
+
+  function openAddToPlaylistPicker(song) {
+    if (!addToPlaylistSheet || !song) return;
+    _addToPlaylistSong = song;
+    addToPlaylistSheet.classList.remove('hidden');
+    if (addToPlSearchInput) addToPlSearchInput.value = '';
+    renderAddToPlaylistList('');
+  }
+
+  function closeAddToPlaylistPicker() {
+    if (addToPlaylistSheet) addToPlaylistSheet.classList.add('hidden');
+    _addToPlaylistSong = null;
+  }
+
+  if (btnCloseAddToPlaylistSheet) btnCloseAddToPlaylistSheet.addEventListener('click', closeAddToPlaylistPicker);
+  if (addToPlaylistSheetBackdrop) addToPlaylistSheetBackdrop.addEventListener('click', closeAddToPlaylistPicker);
+
+  if (addToPlSearchInput) {
+    addToPlSearchInput.addEventListener('input', () => {
+      renderAddToPlaylistList((addToPlSearchInput.value || '').trim().toLowerCase());
+    });
+  }
+
+  if (btnNewPlaylistFromPicker) {
+    btnNewPlaylistFromPicker.addEventListener('click', () => {
+      closeAddToPlaylistPicker();
+      openCreatePlaylistModal();
+      // After creating, we'll auto-add the song to the new playlist via a flag
+      _pendingAddSong = _addToPlaylistSong;
+    });
+  }
+
+  let _pendingAddSong = null;
+  // Monkey-patch create to also add pending song
+  const _origCreate = UserPlaylistManager.create;
+  UserPlaylistManager.create = function(name) {
+    const pl = _origCreate.call(this, name);
+    if (_pendingAddSong && pl) {
+      UserPlaylistManager.addSong(pl.id, _pendingAddSong.id);
+      showToast(`Added "${_pendingAddSong.title}" to "${pl.name}"`);
+      _pendingAddSong = null;
+    }
+    return pl;
+  };
+
+  function renderAddToPlaylistList(filter) {
+    if (!addToPlaylistList) return;
+    const pls = UserPlaylistManager.getAll();
+    const songId = _addToPlaylistSong ? _addToPlaylistSong.id : null;
+
+    const filtered = filter
+      ? pls.filter(p => p.name.toLowerCase().includes(filter))
+      : pls;
+
+    if (filtered.length === 0) {
+      addToPlaylistList.innerHTML = '<div style="padding: 16px; color: #b3b3b3; text-align: center;">No playlists yet. Create one!</div>';
+      return;
+    }
+
+    addToPlaylistList.innerHTML = filtered.map(pl => {
+      const inPlaylist = songId ? UserPlaylistManager.hasSong(pl.id, songId) : false;
+      const initial = pl.name.charAt(0).toUpperCase();
+      return `
+        <div class="add-to-pl-item" data-pl-id="${pl.id}">
+          <div class="pl-item-icon">${initial}</div>
+          <div class="pl-item-meta">
+            <span class="pl-item-name">${pl.name}</span>
+            <span class="pl-item-count">${pl.songIds.length} songs</span>
+          </div>
+          <span class="pl-item-check ${inPlaylist ? '' : 'hidden'}">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </span>
+        </div>
+      `;
+    }).join('');
+
+    addToPlaylistList.querySelectorAll('.add-to-pl-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const plId = item.getAttribute('data-pl-id');
+        if (!_addToPlaylistSong) return;
+        const songId = _addToPlaylistSong.id;
+
+        if (UserPlaylistManager.hasSong(plId, songId)) {
+          UserPlaylistManager.removeSong(plId, songId);
+          showToast(`Removed from "${UserPlaylistManager.getById(plId).name}"`);
+        } else {
+          UserPlaylistManager.addSong(plId, songId);
+          showToast(`Added to "${UserPlaylistManager.getById(plId).name}"`);
+        }
+        renderAddToPlaylistList((addToPlSearchInput ? addToPlSearchInput.value : '').trim().toLowerCase());
+        renderSidebarPlaylists();
+      });
+    });
+  }
+
+  // --- Remove from playlist (context menu) ---
+  const btnContextRemoveFromPlaylist = document.getElementById('btnContextRemoveFromPlaylist');
+  if (btnContextRemoveFromPlaylist) {
+    btnContextRemoveFromPlaylist.addEventListener('click', () => {
+      if (currentContextSong && _activeUserPlaylistId) {
+        UserPlaylistManager.removeSong(_activeUserPlaylistId, currentContextSong.id);
+        showToast(`Removed "${currentContextSong.title}" from playlist`);
+        // Refresh the playlist view
+        const pl = UserPlaylistManager.getById(_activeUserPlaylistId);
+        if (pl) {
+          const songs = UserPlaylistManager.getSongs(pl.id);
+          currentPlaylist = songs;
+          renderTrackTableRows(songs, pl.id);
+          if (playlistTrackCount) playlistTrackCount.textContent = `${songs.length} songs`;
+        }
+        renderSidebarPlaylists();
+      }
+      closeTrackContextSheet();
+    });
+  }
+
+  // --- Override openTrackContextSheet to show/hide remove button ---
+  const _origOpenContext = openTrackContextSheet;
+  // We need to handle context sheet visibility of remove button
+  function openTrackContextSheetWithPlaylist(song) {
+    if (!trackContextSheet || !song) return;
+    currentContextSong = song;
+    if (contextTrackCover) contextTrackCover.src = song.cover_image_url || DEFAULT_SONG_COVER;
+    if (contextTrackTitle) contextTrackTitle.textContent = song.title;
+    if (contextTrackArtist) contextTrackArtist.textContent = song.artist;
+    if (btnContextLikeText) {
+      btnContextLikeText.textContent = song.is_liked ? 'Remove from Liked Songs' : 'Add to Liked Songs';
+    }
+    // Show/hide "Remove from this playlist" button
+    if (btnContextRemoveFromPlaylist) {
+      btnContextRemoveFromPlaylist.classList.toggle('hidden', !_activeUserPlaylistId);
+    }
+    trackContextSheet.classList.remove('hidden');
+  }
+
+  // ==========================================================================
+  // ENHANCED openPlaylistView WITH USER PLAYLIST SUPPORT
+  // ==========================================================================
+  // Wrap the original openPlaylistView to track user playlists
+  const _origOpenPlaylistView = openPlaylistView;
+  // Patch it inline — the existing function is already defined above
+
+  // We need to extend renderTrackTableRows to support remove buttons for user playlists
+  // Monkey-patch by hooking into the existing openPlaylistView
+  // Instead, let's modify the functions more cleanly:
+
+  // We'll override the context sheet opener
+  // Replace fsBtnMore handler to use our enhanced version
+  if (fsBtnMore) {
+    // Remove old listener by replacing element
+    const newFsBtnMore = fsBtnMore.cloneNode(true);
+    fsBtnMore.parentNode.replaceChild(newFsBtnMore, fsBtnMore);
+    addFastTouchListener(newFsBtnMore, () => {
+      if (currentSong) openTrackContextSheetWithPlaylist(currentSong);
+    });
+  }
+
+  // ==========================================================================
+  // RENDER SIDEBAR WITH USER PLAYLISTS
+  // ==========================================================================
+  // Augment existing renderSidebarPlaylists to include user playlists
+  const _origRenderSidebar = renderSidebarPlaylists;
+
+  // We override by inserting user playlists after fixed playlists
+  // The cleanest approach: append user playlists HTML after dynamicLibraryList is rendered
+  // by the original function. We need to hook into the render.
+
+  // Create a MutationObserver-like approach: after each call to renderSidebarPlaylists,
+  // we append user playlists. Let's monkey-patch it.
+
+  const origRenderSidebarFn = renderSidebarPlaylists;
+
+  // We can't reassign the function declaration, so instead we'll add user playlists
+  // in the auto-refresh intervals. Better approach: add after initAppData calls.
+
+  // Actually, let's just add a separate function that appends user playlists:
+  function renderUserPlaylistsInSidebar() {
+    if (!dynamicLibraryList) return;
+
+    // Remove old user playlist items
+    dynamicLibraryList.querySelectorAll('.library-item[data-type="user-playlist"]').forEach(el => el.remove());
+
+    const userPlaylists = UserPlaylistManager.getAll();
+    if (userPlaylists.length === 0) return;
+
+    // Create a divider
+    const dividerHtml = '<div class="library-item" style="height:1px;background:rgba(255,255,255,0.08);margin:8px 12px;padding:0;cursor:default;" data-type="user-playlist"></div>';
+
+    const userPlHtml = userPlaylists.map(pl => {
+      const initial = pl.name.charAt(0).toUpperCase();
+      return `
+        <div class="library-item" data-type="user-playlist" data-upl-id="${pl.id}">
+          <div style="width:40px;height:40px;border-radius:6px;background:linear-gradient(135deg,#450af5,#c4efd9);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0;">${initial}</div>
+          <div class="library-item-meta">
+            <span class="library-item-title">${pl.name}</span>
+            <span class="library-item-sub">Playlist • ${pl.songIds.length} songs</span>
+          </div>
+          <button class="user-pl-delete-btn" data-upl-id="${pl.id}" title="Delete playlist">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    dynamicLibraryList.insertAdjacentHTML('beforeend', dividerHtml + userPlHtml);
+
+    // Wire click handlers
+    dynamicLibraryList.querySelectorAll('.library-item[data-type="user-playlist"]').forEach(item => {
+      if (item.style.height === '1px') return; // skip divider
+
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.user-pl-delete-btn')) return;
+        dynamicLibraryList.querySelectorAll('.library-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        const plId = item.getAttribute('data-upl-id');
+        const pl = UserPlaylistManager.getById(plId);
+        if (!pl) return;
+        const songs = UserPlaylistManager.getSongs(plId);
+        _activeUserPlaylistId = plId;
+        openPlaylistView(pl.name, `Playlist • ${songs.length} songs`, null, songs, plId);
+      });
+    });
+
+    // Wire delete buttons
+    dynamicLibraryList.querySelectorAll('.user-pl-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const plId = btn.getAttribute('data-upl-id');
+        const pl = UserPlaylistManager.getById(plId);
+        if (!pl) return;
+        if (confirm(`Delete playlist "${pl.name}"?`)) {
+          UserPlaylistManager.deletePl(plId);
+          if (_activeUserPlaylistId === plId) _activeUserPlaylistId = null;
+          showToast(`Deleted "${pl.name}"`);
+          renderSidebarPlaylists();
+          renderUserPlaylistsInSidebar();
+          renderHomeView();
+        }
+      });
+    });
+  }
+
+  // ==========================================================================
+  // RENDER USER PLAYLISTS IN MOBILE HOME
+  // ==========================================================================
+  function renderUserPlaylistsInMobileHome() {
+    if (!mobilePlaylistsCarousel) return;
+    // Remove any existing user playlist cards
+    mobilePlaylistsCarousel.querySelectorAll('.user-pl-card').forEach(el => el.remove());
+
+    const userPlaylists = UserPlaylistManager.getAll();
+    if (userPlaylists.length === 0) return;
+
+    const userCardsHtml = userPlaylists.map(pl => {
+      const initial = pl.name.charAt(0).toUpperCase();
+      return `
+        <div class="spotify-card user-pl-card" data-upl-id="${pl.id}">
+          <div class="card-img-wrap">
+            <div style="width:100%;aspect-ratio:1;border-radius:8px;background:linear-gradient(135deg,#450af5,#c4efd9);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:40px;color:#fff;">${initial}</div>
+            <button class="card-play-btn" title="Play ${pl.name}">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+          </div>
+          <span class="card-title" title="${pl.name}">${pl.name}</span>
+          <span class="card-desc">Playlist • ${pl.songIds.length} songs</span>
+        </div>
+      `;
+    }).join('');
+
+    mobilePlaylistsCarousel.insertAdjacentHTML('beforeend', userCardsHtml);
+
+    mobilePlaylistsCarousel.querySelectorAll('.user-pl-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const plId = card.getAttribute('data-upl-id');
+        const pl = UserPlaylistManager.getById(plId);
+        if (!pl) return;
+        const songs = UserPlaylistManager.getSongs(plId);
+        _activeUserPlaylistId = plId;
+        openPlaylistView(pl.name, `Playlist • ${songs.length} songs`, null, songs, plId);
+      });
+    });
+  }
+
+  // ==========================================================================
+  // HOOK: After every renderSidebarPlaylists + renderHomeView, also render user playlists
+  // ==========================================================================
+  // We use a setInterval micro-hook since the original functions are declarations
+  // and we can't reassign them. Instead, let's just call after initAppData completes.
+
+  // Patch initAppData to also render user playlists
+  const _origInitAppData = initAppData;
+  // Can't override a let-binding function expression directly — instead, observe renders:
+
+  // Hook into renderSidebarPlaylists via MutationObserver on dynamicLibraryList
+  if (dynamicLibraryList) {
+    const _sidebarObserver = new MutationObserver(() => {
+      // After sidebar re-renders, append user playlists
+      // Use a debounce to avoid infinite loops
+      clearTimeout(_sidebarObserver._t);
+      _sidebarObserver._t = setTimeout(() => {
+        if (dynamicLibraryList.querySelector('[data-type="user-playlist"]')) return;
+        renderUserPlaylistsInSidebar();
+      }, 50);
+    });
+    _sidebarObserver.observe(dynamicLibraryList, { childList: true });
+  }
+
+  // Hook into renderHomeView via MutationObserver on mobilePlaylistsCarousel
+  if (mobilePlaylistsCarousel) {
+    const _mobileObserver = new MutationObserver(() => {
+      clearTimeout(_mobileObserver._t);
+      _mobileObserver._t = setTimeout(() => {
+        if (mobilePlaylistsCarousel.querySelector('.user-pl-card')) return;
+        renderUserPlaylistsInMobileHome();
+      }, 50);
+    });
+    _mobileObserver.observe(mobilePlaylistsCarousel, { childList: true });
+  }
+
+  // Initial render (after a small delay to let initAppData complete)
+  setTimeout(() => {
+    renderUserPlaylistsInSidebar();
+    renderUserPlaylistsInMobileHome();
+  }, 2000);
+
+  // ==========================================================================
+  // ENHANCED openPlaylistView — 5th parameter: userPlaylistId
+  // ==========================================================================
+  // We need to extend openPlaylistView. Since it's a function declaration,
+  // we wrap it with extra behavior. Store original ref.
+  // The function is already called everywhere. We'll add a hook that checks
+  // if a 5th argument (userPlaylistId) is passed.
+
+  // Save original
+  const __origOpenPlaylistView = openPlaylistView;
+
+  // Override by patching the caller chain. Since we can't reassign the
+  // function declaration directly, we insert our hook at the call sites.
+  // Instead — let's make the track table render aware of _activeUserPlaylistId.
+
+  // Enhance renderTrackTableRows: when _activeUserPlaylistId is set,
+  // add "remove" button to each row and "add songs" button to header.
+
+  // We need to add an "Add Songs" button to the playlist view header.
+  // Find the playlist action bar section in the DOM:
+  const playlistControls = document.querySelector('.playlist-action-bar');
+  let btnAddSongsToPlaylist = document.getElementById('btnAddSongsToPlaylist');
+  if (!btnAddSongsToPlaylist && playlistControls) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'playlist-add-songs-btn';
+    addBtn.id = 'btnAddSongsToPlaylist';
+    addBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Add songs`;
+    playlistControls.appendChild(addBtn);
+    btnAddSongsToPlaylist = addBtn;
+  }
+
+  if (btnAddSongsToPlaylist) {
+    btnAddSongsToPlaylist.addEventListener('click', () => {
+      if (_activeUserPlaylistId) {
+        // Open search view to find songs to add
+        openSearchView();
+        showToast('Search for songs to add to your playlist');
+      }
+    });
+  }
+
+  // Track row click handler for context menus: use enhanced version
+  // Patch the long-press / right-click on mobile track rows to open enhanced context
+  document.addEventListener('contextmenu', (e) => {
+    const row = e.target.closest('.table-row');
+    if (!row) return;
+    e.preventDefault();
+    const songId = row.getAttribute('data-song-id');
+    const song = allSongs.find(s => s.id === songId);
+    if (song) openTrackContextSheetWithPlaylist(song);
+  });
+
+  // ==========================================================================
+  // ALPHABETICAL SORT: Ensure allSongs is always alphabetically sorted
+  // ==========================================================================
+  // Wrap SongCatalogStore.getSongs to sort result alphabetically
+  const _origGetSongs = SongCatalogStore.getSongs;
+  SongCatalogStore.getSongs = async function(forceRefresh) {
+    const songs = await _origGetSongs.call(this, forceRefresh);
+    // Sort alphabetically by title
+    songs.sort((a, b) => {
+      const titleA = (a.title || '').trim().toLowerCase();
+      const titleB = (b.title || '').trim().toLowerCase();
+      return titleA.localeCompare(titleB, undefined, { sensitivity: 'base', numeric: true });
+    });
+    return songs;
+  };
+
+  // ==========================================================================
+  // WIRE: "Add to Playlist" button for each row in playlist/search view
+  // When viewing a user playlist, show remove buttons
+  // ==========================================================================
+
+  // Extend the openPlaylistView to handle _activeUserPlaylistId
+  // We hook into the fact that the existing function doesn't reset _activeUserPlaylistId
+  // So we need to reset it when navigating to non-user playlists
+
+  // Reset _activeUserPlaylistId on Home, Search, Artist navigation
+  const origBtnNavHomeHandler = document.getElementById('btnNavHome');
+  if (origBtnNavHomeHandler) {
+    origBtnNavHomeHandler.addEventListener('click', () => { _activeUserPlaylistId = null; });
+  }
+  document.getElementById('btnNavSearch')?.addEventListener('click', () => { _activeUserPlaylistId = null; });
+
+  // Show/hide the "Add songs" button and control playlist header based on user playlist
+  // We hook via MutationObserver on viewPlaylist
+  if (viewPlaylist) {
+    const _plObserver = new MutationObserver(() => {
+      if (viewPlaylist.classList.contains('active')) {
+        if (btnAddSongsToPlaylist) {
+          btnAddSongsToPlaylist.classList.toggle('visible', !!_activeUserPlaylistId);
+        }
+      }
+    });
+    _plObserver.observe(viewPlaylist, { attributes: true, attributeFilter: ['class'] });
   }
 
 })();

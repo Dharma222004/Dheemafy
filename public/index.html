@@ -1230,8 +1230,7 @@
         <div class="create-option-item" id="btnCreateNewPlaylist">
           <div class="create-icon-box">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-              <path
-                d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
             </svg>
           </div>
           <div class="create-meta">
@@ -1251,6 +1250,40 @@
             <span class="create-desc">Combine tastes in a playlist made for you and friends</span>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE PLAYLIST MODAL (Premium) -->
+  <div class="dh-modal-overlay hidden" id="createPlaylistModal">
+    <div class="dh-modal-card">
+      <h3 class="dh-modal-title">Create Playlist</h3>
+      <input type="text" class="dh-modal-input" id="createPlaylistNameInput" placeholder="Playlist name" maxlength="80" autocomplete="off" spellcheck="false">
+      <div class="dh-modal-actions">
+        <button class="dh-btn-secondary" id="btnCancelCreatePlaylist">Cancel</button>
+        <button class="dh-btn-primary" id="btnConfirmCreatePlaylist">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD TO PLAYLIST PICKER BOTTOM SHEET -->
+  <div class="mobile-bottom-sheet hidden" id="addToPlaylistSheet">
+    <div class="sheet-backdrop" id="addToPlaylistSheetBackdrop"></div>
+    <div class="sheet-content">
+      <div class="sheet-handle-bar"></div>
+      <div class="sheet-header">
+        <h3>Add to playlist</h3>
+        <button class="sheet-close-btn" id="btnCloseAddToPlaylistSheet">✕</button>
+      </div>
+      <div class="add-to-pl-search-wrap">
+        <input type="text" class="dh-modal-input" id="addToPlSearchInput" placeholder="Find a playlist" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="add-to-pl-new-btn" id="btnNewPlaylistFromPicker">
+        <div class="create-icon-box"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></div>
+        <span>New Playlist</span>
+      </div>
+      <div class="add-to-pl-list" id="addToPlaylistList">
+        <!-- dynamically populated -->
       </div>
     </div>
   </div>
@@ -1282,6 +1315,12 @@
               d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
           </svg>
           <span>Add to playlist</span>
+        </button>
+        <button class="context-item hidden" id="btnContextRemoveFromPlaylist">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M19 13H5v-2h14v2z"/>
+          </svg>
+          <span>Remove from this playlist</span>
         </button>
         <button class="context-item" id="btnContextViewArtist">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
