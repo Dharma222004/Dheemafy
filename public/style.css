@@ -4754,6 +4754,26 @@ body {
   display: block;
 }
 
+/* Fullscreen Repeat Button */
+.fs-repeat-btn {
+  position: relative;
+}
+
+.fs-repeat-btn.active {
+  color: #1ed760 !important;
+}
+
+.fs-repeat-btn .fs-repeat-one-badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #1ed760;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .fs-prev-btn svg,
 .fs-next-btn svg {
   fill: #ffffff;

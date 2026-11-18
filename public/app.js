@@ -462,6 +462,8 @@
   const fsPlaySvg = document.getElementById('fsPlaySvg');
   const fsPauseSvg = document.getElementById('fsPauseSvg');
   const fsBtnNext = document.getElementById('fsBtnNext');
+  const fsBtnRepeat = document.getElementById('fsBtnRepeat');
+  const fsRepeatOneBadge = document.getElementById('fsRepeatOneBadge');
   const fsBtnTimer = document.getElementById('fsBtnTimer');
   const fsDeviceBadge = document.getElementById('fsDeviceBadge');
   const fsDeviceName = document.getElementById('fsDeviceName');
@@ -794,6 +796,9 @@
     if (!forceRefresh && isAppInitialized) return;
     if (initAppPromise) return initAppPromise;
 
+    // On force-refresh, reset the initialized flag so home re-renders
+    if (forceRefresh) isAppInitialized = false;
+
     initAppPromise = (async () => {
       if (greetingTitle) updateGreeting();
       try {
@@ -839,11 +844,22 @@
           // Non-destructive update: Maintain currently active track & playlist without resetting playback!
           const activeTrack = activePlaybackPlaylist[currentTrackIndex] || (audio && audio.src ? allSongs.find(s => s.audio_url === audio.src) : null);
           if (activeTrack) {
+            // Refresh the active song object so its metadata/URL is up-to-date
+            const freshSong = allSongs.find(s => s.id === activeTrack.id);
+            if (freshSong) {
+              currentSong = freshSong;
+              activePlaybackPlaylist[currentTrackIndex] = freshSong;
+            }
             const newIdx = activePlaybackPlaylist.findIndex(s => s.id === activeTrack.id);
             if (newIdx !== -1) {
               currentTrackIndex = newIdx;
             }
           }
+          // Rebuild active playlist with fresh song objects (preserves order & current position)
+          activePlaybackPlaylist = activePlaybackPlaylist.map(s => {
+            const fresh = allSongs.find(f => f.id === s.id);
+            return fresh || s;
+          });
           // Update browsing context but leave activePlaybackPlaylist untouched
           currentPlaylist = [...allSongs];
         }
@@ -861,6 +877,11 @@
         }
 
         isAppInitialized = true;
+
+        if (forceRefresh) {
+          console.log(`[App] Catalog refreshed: ${allSongs.length} songs loaded.`);
+          showToast(`Library updated: ${allSongs.length} songs`);
+        }
       } catch (err) {
         console.error('Failed to load initial Spotify data:', err);
         showToast(`Error loading songs: ${err.message || 'Check server connection'}`);
@@ -872,6 +893,25 @@
     return initAppPromise;
   }
   window.spotkifyInitApp = initAppData;
+
+  // ==========================================================================
+  // CATALOG AUTO-REFRESH POLLING
+  // Every 2 minutes, silently check if the server catalog changed (e.g. because
+  // you uploaded a new song to Cloudinary). If it did, refresh the UI without
+  // interrupting the currently playing track.
+  // ==========================================================================
+  setInterval(async () => {
+    if (!isAppInitialized) return; // Don't poll until initial load is done
+    try {
+      const changed = await SongCatalogStore.checkVersionAndSyncIfNeeded();
+      if (changed) {
+        console.log('[CatalogPoller] Catalog changed on server — refreshing UI...');
+        await initAppData(true);
+      }
+    } catch (pollErr) {
+      console.warn('[CatalogPoller] Poll error:', pollErr.message || pollErr);
+    }
+  }, 2 * 60 * 1000); // every 2 minutes
 
   // ==========================================================================
   // RENDER HOME VIEW
@@ -2903,6 +2943,7 @@
 
   // FIX-1: 3-state repeat cycle: off → all → one → off
   function updateRepeatUI() {
+    // --- Desktop bar button ---
     if (repeatMode === 'off') {
       barBtnRepeat.classList.remove('active', 'repeat-one');
       barBtnRepeat.title = 'Enable repeat all';
@@ -2913,6 +2954,26 @@
     } else { // 'one'
       barBtnRepeat.classList.add('active', 'repeat-one');
       barBtnRepeat.title = 'Repeat one — click to disable';
+    }
+
+    // --- Fullscreen repeat button ---
+    if (fsBtnRepeat) {
+      if (repeatMode === 'off') {
+        fsBtnRepeat.classList.remove('active');
+        fsBtnRepeat.style.color = '';
+        fsBtnRepeat.title = 'Enable repeat all';
+        if (fsRepeatOneBadge) fsRepeatOneBadge.style.display = 'none';
+      } else if (repeatMode === 'all') {
+        fsBtnRepeat.classList.add('active');
+        fsBtnRepeat.style.color = '#1ed760';
+        fsBtnRepeat.title = 'Repeat all — click for repeat one';
+        if (fsRepeatOneBadge) fsRepeatOneBadge.style.display = 'none';
+      } else { // 'one'
+        fsBtnRepeat.classList.add('active');
+        fsBtnRepeat.style.color = '#1ed760';
+        fsBtnRepeat.title = 'Repeat one — click to disable';
+        if (fsRepeatOneBadge) fsRepeatOneBadge.style.display = 'block';
+      }
     }
   }
 
@@ -3168,6 +3229,7 @@
     if (fsBtnShuffle) fsBtnShuffle.classList.toggle('active', isShuffle);
     if (fsShuffleDot) fsShuffleDot.style.display = isShuffle ? 'block' : 'none';
     if (fsBtnTimer) fsBtnTimer.classList.toggle('active', sleepTimerMinutes > 0);
+    updateRepeatUI(); // Sync repeat state to fullscreen UI
 
     if (currentSong) {
       const coverArt = currentSong.cover_image_url || DEFAULT_SONG_COVER;
@@ -3243,6 +3305,17 @@
       if (fsShuffleDot) fsShuffleDot.style.display = isShuffle ? 'block' : 'none';
       if (barBtnShuffle) barBtnShuffle.classList.toggle('active', isShuffle);
       showToast(isShuffle ? 'Shuffle is ON' : 'Shuffle is OFF');
+    });
+  }
+
+  if (fsBtnRepeat) {
+    addFastTouchListener(fsBtnRepeat, () => {
+      if (repeatMode === 'off') repeatMode = 'all';
+      else if (repeatMode === 'all') repeatMode = 'one';
+      else repeatMode = 'off';
+      updateRepeatUI();
+      const messages = { off: 'Repeat is OFF', all: 'Repeat All is ON', one: 'Repeat One is ON' };
+      showToast(messages[repeatMode]);
     });
   }
 

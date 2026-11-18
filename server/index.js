@@ -3,6 +3,9 @@ const path = require('node:path');
 const express = require('express');
 const cors = require('cors');
 
+// Cloudinary direct service (PRIMARY catalog source — bypasses SQLite)
+const cloudinaryDirect = require('./services/cloudinaryDirectService');
+
 // Initialize database
 require('./db/database');
 
@@ -112,6 +115,55 @@ app.all('/api/revalidate', async (req, res) => {
         httpCode
       }
     });
+  }
+});
+
+// ==========================================================================
+// CLOUDINARY WEBHOOK — Auto-sync when you upload/delete/update songs in Cloudinary.
+// Configure this URL in your Cloudinary dashboard:
+//   Dashboard → Settings → Webhooks → Add Notification URL:
+//   https://<your-domain>/api/cloudinary-webhook
+// Events to subscribe: upload, delete, rename, eager
+// ==========================================================================
+app.post('/api/cloudinary-webhook', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const notificationType = body.notification_type || body.type || '';
+    const resourceType = body.resource_type || '';
+    const folder = body.asset_folder || body.folder || 'Songs';
+
+    console.log(`[Webhook] Cloudinary notification received: type="${notificationType}", resource_type="${resourceType}", folder="${folder}"`);
+
+    // Only react to audio (video resource_type in Cloudinary) upload/delete/rename events
+    const isAudioEvent = resourceType === 'video' || !resourceType;
+    const isRelevantEvent = ['upload', 'delete', 'rename', 'eager', 'destroy'].includes(notificationType);
+
+    if (!isAudioEvent || !isRelevantEvent) {
+      console.log(`[Webhook] Ignoring non-audio or non-relevant event: type="${notificationType}", resource_type="${resourceType}"`);
+      return res.json({ received: true, synced: false, reason: 'Non-audio or non-relevant event' });
+    }
+
+    // 1. Immediately invalidate the in-memory Cloudinary catalog cache
+    //    so the VERY NEXT request to /api/songs, /api/home etc. gets fresh data
+    cloudinaryDirect.invalidateCache();
+
+    // Trigger background sync (non-blocking — respond immediately so Cloudinary doesn't retry)
+    res.json({ received: true, synced: true, message: 'Cache invalidated + sync triggered in background' });
+
+    // 2. Also run the SQLite sync in background (kept for consistency but not required)
+    setImmediate(async () => {
+      try {
+        const syncFolder = (typeof folder === 'string' && folder.startsWith('Songs')) ? 'Songs' : 'Songs';
+        console.log(`[Webhook] Pre-warming Cloudinary direct cache for folder "${syncFolder}"...`);
+        const songs = await cloudinaryDirect.getCachedSongs(true, syncFolder);
+        console.log(`[Webhook] Cache pre-warm complete: ${songs.length} songs loaded.`);
+      } catch (syncErr) {
+        console.error('[Webhook] Cache pre-warm error:', syncErr.message || syncErr);
+      }
+    });
+  } catch (err) {
+    console.error('[Webhook] Handler error:', err.message || err);
+    res.status(500).json({ received: false, error: err.message || 'Webhook processing failed' });
   }
 });
 

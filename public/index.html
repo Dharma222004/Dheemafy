@@ -1378,7 +1378,7 @@
         </div>
       </div>
 
-      <!-- Playback Controls Row (Shuffle, Prev, Big Play, Next, Sleep Timer) -->
+      <!-- Playback Controls Row (Shuffle, Prev, Big Play, Next, Repeat) -->
       <div class="fs-controls-row">
         <button class="fs-ctrl-btn fs-shuffle-btn" id="fsBtnShuffle" title="Shuffle" aria-label="Shuffle">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
@@ -1405,8 +1405,18 @@
             <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
           </svg>
         </button>
-        <button class="fs-ctrl-btn fs-timer-btn" id="fsBtnTimer" title="Sleep timer" aria-label="Sleep timer">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
+        <button class="fs-ctrl-btn fs-repeat-btn" id="fsBtnRepeat" title="Enable repeat all" aria-label="Repeat">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+          </svg>
+          <span class="fs-repeat-one-badge" id="fsRepeatOneBadge" style="display:none;position:absolute;top:2px;right:4px;font-size:9px;font-weight:800;color:#1ed760;line-height:1;">1</span>
+        </button>
+      </div>
+
+      <!-- Sleep Timer button moved to footer row -->
+      <div style="display:flex;justify-content:center;margin-top:4px;">
+        <button class="fs-ctrl-btn fs-timer-btn" id="fsBtnTimer" title="Sleep timer" aria-label="Sleep timer" style="opacity:0.7;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="13" r="8"></circle>
             <path d="M12 9v4l2.5 2.5"></path>
