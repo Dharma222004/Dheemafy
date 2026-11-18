@@ -1044,14 +1044,37 @@
       };
     }
 
-    // 2. NEW FIXED PLAYLISTS (SECOND SECTION) – replaces old Cloudinary folder playlists
+    // 2. FIXED PLAYLISTS (SECOND SECTION) – User playlists in FIRST place
     if (mobilePlaylistsCarousel) {
+      const userPlaylists = (typeof UserPlaylistManager !== 'undefined') ? UserPlaylistManager.getAll() : [];
+      const userCardsHtml = userPlaylists.map(pl => {
+        const initial = (pl.name || 'P').charAt(0).toUpperCase();
+        const pSongs = (typeof UserPlaylistManager !== 'undefined') ? UserPlaylistManager.getSongs(pl.id) : [];
+        const firstCover = (pSongs.length > 0 && pSongs[0].cover_image_url) ? pSongs[0].cover_image_url : null;
+        const count = pl.songIds ? pl.songIds.length : 0;
+        const imgWrap = firstCover
+          ? `<img class="card-img" src="${firstCover}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">`
+          : `<div style="width:100%;aspect-ratio:1;border-radius:8px;background:linear-gradient(135deg,#450af5,#1db954);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:36px;color:#fff;">${initial}</div>`;
+        return `
+          <div class="spotify-card user-pl-card" data-upl-id="${pl.id}">
+            <div class="card-img-wrap">
+              ${imgWrap}
+              <button class="card-play-btn" title="Play ${pl.name}">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+            </div>
+            <span class="card-title" title="${pl.name}">${pl.name}</span>
+            <span class="card-desc">Playlist • ${count} songs</span>
+          </div>
+        `;
+      }).join('');
+
       const renderedPlaylists = PLAYLIST_DEFINITIONS.map(pl => {
         const songs = getPlaylistSongs(pl);
         return { ...pl, song_count: songs.length, tracks: songs };
       });
 
-      mobilePlaylistsCarousel.innerHTML = renderedPlaylists.map(pl => `
+      const fixedCardsHtml = renderedPlaylists.map(pl => `
         <div class="spotify-card playlist-card" data-playlist-id="${pl.id}" data-playlist-name="${pl.name}">
           <div class="card-img-wrap">
             <img class="card-img" src="${pl.cover || DEFAULT_SONG_COVER}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
@@ -1064,6 +1087,36 @@
         </div>
       `).join('');
 
+      // USER PLAYLISTS COME FIRST
+      mobilePlaylistsCarousel.innerHTML = userCardsHtml + fixedCardsHtml;
+
+      // Wire user playlist card clicks & direct play button
+      mobilePlaylistsCarousel.querySelectorAll('.user-pl-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+          const plId = card.getAttribute('data-upl-id');
+          const pl = UserPlaylistManager.getById(plId);
+          if (!pl) return;
+          const songs = UserPlaylistManager.getSongs(plId);
+          _activeUserPlaylistId = plId;
+          if (e.target.closest('.card-play-btn')) {
+            e.stopPropagation();
+            if (songs.length > 0) {
+              _activePlaybackPlaylistId = plId;
+              activePlaybackPlaylist = [...songs];
+              currentPlaylist = [...songs];
+              currentTrackIndex = 0;
+              playTrack(songs[0]);
+              showToast(`Playing "${pl.name}"`);
+            } else {
+              showToast(`"${pl.name}" is empty`);
+            }
+            return;
+          }
+          openPlaylistView(pl.name, `Playlist • ${songs.length} songs`, null, songs, plId);
+        });
+      });
+
+      // Wire fixed playlist card clicks
       mobilePlaylistsCarousel.querySelectorAll('.playlist-card').forEach(card => {
         card.addEventListener('click', () => {
           const plName = card.getAttribute('data-playlist-name');
@@ -1071,17 +1124,13 @@
           if (!plDef) return;
           const tracks = getPlaylistSongs(plDef);
           const desc = plDef.type === 'all'
-            ? `Complete library with ${tracks.length} songs `
-            : plDef.type === 'folder'
-              ? `Songs from folder "${plDef.name}" • ${tracks.length} songs`
-              : plDef.type === 'other'
-                ? `All songs not in the main artist playlists • ${tracks.length} songs`
-                : `Songs by ${plDef.name} • ${tracks.length} songs`;
+            ? `Complete library with ${tracks.length} songs`
+            : plDef.type === 'other'
+              ? `All songs not in the main artist playlists • ${tracks.length} songs`
+              : `Songs by ${plDef.name} • ${tracks.length} songs`;
           openPlaylistView(plDef.name, desc, plDef.cover, tracks);
         });
       });
-
-      renderUserPlaylistsInMobileHome();
     }
 
     if (mobileBtnShowAllPlaylists) {
@@ -1315,9 +1364,32 @@
       });
     }
 
-    // 1.5 Featured Playlists Shelf (New Fixed Playlists - replaces old DB folder playlists)
+    // 1.5 Featured Playlists Shelf (Desktop Home) – User playlists in FIRST place
     if (featuredPlaylistsShelf) {
-      featuredPlaylistsShelf.innerHTML = PLAYLIST_DEFINITIONS.map(pl => {
+      const userPlaylists = (typeof UserPlaylistManager !== 'undefined') ? UserPlaylistManager.getAll() : [];
+      const userCardsHtml = userPlaylists.map(pl => {
+        const initial = (pl.name || 'P').charAt(0).toUpperCase();
+        const pSongs = (typeof UserPlaylistManager !== 'undefined') ? UserPlaylistManager.getSongs(pl.id) : [];
+        const firstCover = (pSongs.length > 0 && pSongs[0].cover_image_url) ? pSongs[0].cover_image_url : null;
+        const count = pl.songIds ? pl.songIds.length : 0;
+        const imgWrap = firstCover
+          ? `<img class="card-img" src="${firstCover}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">`
+          : `<div style="width:100%;aspect-ratio:1;border-radius:8px;background:linear-gradient(135deg,#450af5,#1db954);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:36px;color:#fff;">${initial}</div>`;
+        return `
+          <div class="spotify-card user-pl-card" data-upl-id="${pl.id}">
+            <div class="card-img-wrap">
+              ${imgWrap}
+              <button class="card-play-btn" title="Play ${pl.name}">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+            </div>
+            <span class="card-title" title="${pl.name}">${pl.name}</span>
+            <span class="card-desc">Playlist • ${count} songs</span>
+          </div>
+        `;
+      }).join('');
+
+      const fixedCardsHtml = PLAYLIST_DEFINITIONS.map(pl => {
         const songs = getPlaylistSongs(pl);
         return `
           <div class="spotify-card playlist-card" data-playlist-name="${pl.name}">
@@ -1333,6 +1405,34 @@
         `;
       }).join('');
 
+      // USER PLAYLISTS COME IN FIRST PLACE
+      featuredPlaylistsShelf.innerHTML = userCardsHtml + fixedCardsHtml;
+
+      featuredPlaylistsShelf.querySelectorAll('.user-pl-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+          const plId = card.getAttribute('data-upl-id');
+          const pl = UserPlaylistManager.getById(plId);
+          if (!pl) return;
+          const songs = UserPlaylistManager.getSongs(plId);
+          _activeUserPlaylistId = plId;
+          if (e.target.closest('.card-play-btn')) {
+            e.stopPropagation();
+            if (songs.length > 0) {
+              _activePlaybackPlaylistId = plId;
+              activePlaybackPlaylist = [...songs];
+              currentPlaylist = [...songs];
+              currentTrackIndex = 0;
+              playTrack(songs[0]);
+              showToast(`Playing "${pl.name}"`);
+            } else {
+              showToast(`"${pl.name}" is empty`);
+            }
+            return;
+          }
+          openPlaylistView(pl.name, `Playlist • ${songs.length} songs`, null, songs, plId);
+        });
+      });
+
       featuredPlaylistsShelf.querySelectorAll('.playlist-card').forEach(card => {
         card.addEventListener('click', () => {
           const plName = card.getAttribute('data-playlist-name');
@@ -1340,17 +1440,13 @@
           if (!plDef) return;
           const tracks = getPlaylistSongs(plDef);
           const desc = plDef.type === 'all'
-            ? `Complete library with ${tracks.length} songs `
-            : plDef.type === 'folder'
-              ? `Songs from folder "${plDef.name}" • ${tracks.length} songs`
-              : plDef.type === 'other'
-                ? `All songs not in the main artist playlists • ${tracks.length} songs`
-                : `Songs by ${plDef.name} • ${tracks.length} songs`;
+            ? `Complete library with ${tracks.length} songs`
+            : plDef.type === 'other'
+              ? `All songs not in the main artist playlists • ${tracks.length} songs`
+              : `Songs by ${plDef.name} • ${tracks.length} songs`;
           openPlaylistView(plDef.name, desc, plDef.cover, tracks);
         });
       });
-
-      renderUserPlaylistsInMobileHome();
     }
 
     // 2. Trending Shelf
@@ -1455,15 +1551,38 @@
 
     if (!dynamicLibraryList) return;
 
-    // Build sidebar list: fixed playlists first, then dynamic music director playlists
+    // 1. USER PLAYLISTS COME IN FIRST PLACE (Top of library, right below Liked Songs)
+    const userPlaylists = (typeof UserPlaylistManager !== 'undefined') ? UserPlaylistManager.getAll() : [];
+    const userPlaylistItems = userPlaylists.map(pl => {
+      const initial = (pl.name || 'P').charAt(0).toUpperCase();
+      const pSongs = (typeof UserPlaylistManager !== 'undefined') ? UserPlaylistManager.getSongs(pl.id) : [];
+      const firstCover = (pSongs.length > 0 && pSongs[0].cover_image_url) ? pSongs[0].cover_image_url : null;
+      const count = pl.songIds ? pl.songIds.length : 0;
+      const coverHtml = firstCover
+        ? `<img class="library-item-img" src="${firstCover}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">`
+        : `<div class="user-pl-cover-box" style="width:48px;height:48px;border-radius:4px;background:linear-gradient(135deg,#450af5,#1db954);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;color:#fff;flex-shrink:0;">${initial}</div>`;
+      return `
+        <div class="library-item" data-type="user-playlist" data-category="playlist" data-upl-id="${pl.id}" data-playlist-name="${pl.name}">
+          ${coverHtml}
+          <div class="library-item-meta">
+            <span class="library-item-title">${pl.name}</span>
+            <span class="library-item-sub">Playlist • ${count} songs</span>
+          </div>
+          <button class="user-pl-delete-btn" data-upl-id="${pl.id}" title="Delete playlist">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    // 2. Fixed playlists (All Songs, Anirudh, A.R Rahman, Sid Sriram, Other Artists)
     const fixedPlaylistItems = PLAYLIST_DEFINITIONS.map(pl => {
       const songs = getPlaylistSongs(pl);
       const coverUrl = pl.cover || DEFAULT_SONG_COVER;
-      const sub = pl.type === 'all' ? `Playlist • ${songs.length} songs` :
-        pl.type === 'other' ? `Playlist • ${songs.length} songs` :
-          `Playlist • ${songs.length} songs`;
+      const sub = `Playlist • ${songs.length} songs`;
+      const cat = pl.type === 'artist' ? 'artist' : 'playlist';
       return `
-        <div class="library-item" data-type="playlist" data-playlist-id="${pl.id}" data-playlist-name="${pl.name}">
+        <div class="library-item" data-type="playlist" data-category="${cat}" data-playlist-id="${pl.id}" data-playlist-name="${pl.name}">
           <img class="library-item-img" src="${coverUrl}" alt="${pl.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <div class="library-item-meta">
             <span class="library-item-title">${pl.name}</span>
@@ -1473,13 +1592,12 @@
       `;
     }).join('');
 
-    // Dynamic music director playlists (only those with songs, excluding already-fixed artists)
+    // 3. Dynamic music director playlists (only those with songs, excluding already-fixed artists)
     const fixedAliases = PLAYLIST_DEFINITIONS
       .filter(p => p.type === 'artist')
       .flatMap(p => p.aliases);
 
     const directorItems = KNOWN_MUSIC_DIRECTORS.map(dir => {
-      // Skip if this director is already covered by a fixed playlist
       const isFixed = fixedAliases.some(alias =>
         dir.aliases.some(da => da.includes(alias) || alias.includes(da))
       );
@@ -1488,7 +1606,7 @@
       if (songs.length === 0) return '';
       const coverUrl = dir.cover || DEFAULT_SONG_COVER;
       return `
-        <div class="library-item" data-type="director" data-director="${dir.name}">
+        <div class="library-item" data-type="director" data-category="artist" data-director="${dir.name}">
           <img class="library-item-img circle" src="${coverUrl}" alt="${dir.name}" onerror="this.onerror=null; this.src='${DEFAULT_SONG_COVER}';">
           <div class="library-item-meta">
             <span class="library-item-title">${dir.name}</span>
@@ -1498,12 +1616,45 @@
       `;
     }).join('');
 
-    dynamicLibraryList.innerHTML = fixedPlaylistItems + directorItems;
+    // RENDER: USER PLAYLISTS COME IN FIRST PLACE!
+    dynamicLibraryList.innerHTML = userPlaylistItems + fixedPlaylistItems + directorItems;
+
+    // User playlist click handlers
+    dynamicLibraryList.querySelectorAll('.library-item[data-type="user-playlist"]').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.user-pl-delete-btn')) return;
+        document.querySelectorAll('.library-items-list .library-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        const plId = item.getAttribute('data-upl-id');
+        const pl = UserPlaylistManager.getById(plId);
+        if (!pl) return;
+        const songs = UserPlaylistManager.getSongs(plId);
+        _activeUserPlaylistId = plId;
+        openPlaylistView(pl.name, `Playlist • ${songs.length} songs`, null, songs, plId);
+      });
+    });
+
+    // User playlist delete handlers
+    dynamicLibraryList.querySelectorAll('.user-pl-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const plId = btn.getAttribute('data-upl-id');
+        const pl = UserPlaylistManager.getById(plId);
+        if (!pl) return;
+        if (confirm(`Delete playlist "${pl.name}"?`)) {
+          UserPlaylistManager.deletePl(plId);
+          if (_activeUserPlaylistId === plId) _activeUserPlaylistId = null;
+          showToast(`Deleted "${pl.name}"`);
+          renderSidebarPlaylists();
+          renderHomeView();
+        }
+      });
+    });
 
     // Fixed playlist click handlers
     dynamicLibraryList.querySelectorAll('.library-item[data-type="playlist"]').forEach(item => {
       item.addEventListener('click', () => {
-        dynamicLibraryList.querySelectorAll('.library-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.library-items-list .library-item').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
         const plName = item.getAttribute('data-playlist-name');
         const plDef = PLAYLIST_DEFINITIONS.find(p => p.name === plName);
@@ -1511,11 +1662,9 @@
         const tracks = getPlaylistSongs(plDef);
         const desc = plDef.type === 'all'
           ? `Complete library with ${tracks.length} songs`
-          : plDef.type === 'folder'
-            ? `Songs from folder "${plDef.name}" • ${tracks.length} songs`
-            : plDef.type === 'other'
-              ? `All songs not in the main artist playlists • ${tracks.length} songs`
-              : `Songs by ${plDef.name} • ${tracks.length} songs`;
+          : plDef.type === 'other'
+            ? `All songs not in the main artist playlists • ${tracks.length} songs`
+            : `Songs by ${plDef.name} • ${tracks.length} songs`;
         openPlaylistView(plDef.name, desc, plDef.cover, tracks);
       });
     });
@@ -1523,7 +1672,7 @@
     // Music director playlist click handlers
     dynamicLibraryList.querySelectorAll('.library-item[data-type="director"]').forEach(item => {
       item.addEventListener('click', () => {
-        dynamicLibraryList.querySelectorAll('.library-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.library-items-list .library-item').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
         const dirName = item.getAttribute('data-director');
         const dirObj = KNOWN_MUSIC_DIRECTORS.find(d => d.name === dirName);
@@ -1555,7 +1704,54 @@
       };
     });
 
-    renderUserPlaylistsInSidebar();
+    // Re-apply library search/filter if active
+    if (typeof applyLibraryFilter === 'function') {
+      applyLibraryFilter();
+    }
+  }
+
+  // Filter chips in sidebar (Playlists vs Artists)
+  function applyLibraryFilter() {
+    const activeChip = document.querySelector('.library-chips .chip.active');
+    const filter = activeChip ? activeChip.getAttribute('data-filter') : 'all';
+    const searchInput = document.getElementById('librarySearchInput');
+    const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+
+    const items = document.querySelectorAll('.library-items-list .library-item');
+    items.forEach(item => {
+      if (item.style && item.style.height === '1px') return;
+      const type = item.getAttribute('data-type');
+      const cat = item.getAttribute('data-category') || (type === 'director' ? 'artist' : 'playlist');
+      const title = (item.querySelector('.library-item-title')?.textContent || '').toLowerCase();
+
+      let show = true;
+      if (filter === 'artists') {
+        if (cat === 'playlist') show = false;
+      } else if (filter === 'all') {
+        if (cat === 'artist' && type === 'director') show = false;
+      }
+
+      if (query && !title.includes(query)) {
+        show = false;
+      }
+
+      item.style.display = show ? 'flex' : 'none';
+    });
+  }
+
+  document.querySelectorAll('.library-chips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.library-chips .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      applyLibraryFilter();
+    });
+  });
+
+  const libSearchInputElem = document.getElementById('librarySearchInput');
+  if (libSearchInputElem) {
+    libSearchInputElem.addEventListener('input', () => {
+      applyLibraryFilter();
+    });
   }
 
   async function openFolderPlaylist(folderName, plId) {
@@ -4917,172 +5113,15 @@
   }
 
   // ==========================================================================
-  // RENDER SIDEBAR WITH USER PLAYLISTS
+  // USER PLAYLIST RENDER WRAPPERS (Native First-Place in Sidebar & Home)
   // ==========================================================================
-  // Augment existing renderSidebarPlaylists to include user playlists
-  const _origRenderSidebar = renderSidebarPlaylists;
-
-  // We override by inserting user playlists after fixed playlists
-  // The cleanest approach: append user playlists HTML after dynamicLibraryList is rendered
-  // by the original function. We need to hook into the render.
-
-  // Create a MutationObserver-like approach: after each call to renderSidebarPlaylists,
-  // we append user playlists. Let's monkey-patch it.
-
-  const origRenderSidebarFn = renderSidebarPlaylists;
-
-  // We can't reassign the function declaration, so instead we'll add user playlists
-  // in the auto-refresh intervals. Better approach: add after initAppData calls.
-
-  // Actually, let's just add a separate function that appends user playlists:
   function renderUserPlaylistsInSidebar() {
-    if (!dynamicLibraryList) return;
-
-    // Remove old user playlist items
-    dynamicLibraryList.querySelectorAll('.library-item[data-type="user-playlist"]').forEach(el => el.remove());
-
-    const userPlaylists = UserPlaylistManager.getAll();
-    if (userPlaylists.length === 0) return;
-
-    // Create a divider
-    const dividerHtml = '<div class="library-item" style="height:1px;background:rgba(255,255,255,0.08);margin:8px 12px;padding:0;cursor:default;" data-type="user-playlist"></div>';
-
-    const userPlHtml = userPlaylists.map(pl => {
-      const initial = pl.name.charAt(0).toUpperCase();
-      return `
-        <div class="library-item" data-type="user-playlist" data-upl-id="${pl.id}">
-          <div style="width:40px;height:40px;border-radius:6px;background:linear-gradient(135deg,#450af5,#c4efd9);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0;">${initial}</div>
-          <div class="library-item-meta">
-            <span class="library-item-title">${pl.name}</span>
-            <span class="library-item-sub">Playlist • ${pl.songIds.length} songs</span>
-          </div>
-          <button class="user-pl-delete-btn" data-upl-id="${pl.id}" title="Delete playlist">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-          </button>
-        </div>
-      `;
-    }).join('');
-
-    dynamicLibraryList.insertAdjacentHTML('beforeend', dividerHtml + userPlHtml);
-
-    // Wire click handlers
-    dynamicLibraryList.querySelectorAll('.library-item[data-type="user-playlist"]').forEach(item => {
-      if (item.style.height === '1px') return; // skip divider
-
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('.user-pl-delete-btn')) return;
-        dynamicLibraryList.querySelectorAll('.library-item').forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
-        const plId = item.getAttribute('data-upl-id');
-        const pl = UserPlaylistManager.getById(plId);
-        if (!pl) return;
-        const songs = UserPlaylistManager.getSongs(plId);
-        _activeUserPlaylistId = plId;
-        openPlaylistView(pl.name, `Playlist • ${songs.length} songs`, null, songs, plId);
-      });
-    });
-
-    // Wire delete buttons
-    dynamicLibraryList.querySelectorAll('.user-pl-delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const plId = btn.getAttribute('data-upl-id');
-        const pl = UserPlaylistManager.getById(plId);
-        if (!pl) return;
-        if (confirm(`Delete playlist "${pl.name}"?`)) {
-          UserPlaylistManager.deletePl(plId);
-          if (_activeUserPlaylistId === plId) _activeUserPlaylistId = null;
-          showToast(`Deleted "${pl.name}"`);
-          renderSidebarPlaylists();
-          renderUserPlaylistsInSidebar();
-          renderHomeView();
-        }
-      });
-    });
+    renderSidebarPlaylists();
   }
 
-  // ==========================================================================
-  // RENDER USER PLAYLISTS IN MOBILE HOME
-  // ==========================================================================
   function renderUserPlaylistsInMobileHome() {
-    if (!mobilePlaylistsCarousel) return;
-    // Remove any existing user playlist cards
-    mobilePlaylistsCarousel.querySelectorAll('.user-pl-card').forEach(el => el.remove());
-
-    const userPlaylists = UserPlaylistManager.getAll();
-    if (userPlaylists.length === 0) return;
-
-    const userCardsHtml = userPlaylists.map(pl => {
-      const initial = pl.name.charAt(0).toUpperCase();
-      return `
-        <div class="spotify-card user-pl-card" data-upl-id="${pl.id}">
-          <div class="card-img-wrap">
-            <div style="width:100%;aspect-ratio:1;border-radius:8px;background:linear-gradient(135deg,#450af5,#c4efd9);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:40px;color:#fff;">${initial}</div>
-            <button class="card-play-btn" title="Play ${pl.name}">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-            </button>
-          </div>
-          <span class="card-title" title="${pl.name}">${pl.name}</span>
-          <span class="card-desc">Playlist • ${pl.songIds.length} songs</span>
-        </div>
-      `;
-    }).join('');
-
-    mobilePlaylistsCarousel.insertAdjacentHTML('beforeend', userCardsHtml);
-
-    mobilePlaylistsCarousel.querySelectorAll('.user-pl-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const plId = card.getAttribute('data-upl-id');
-        const pl = UserPlaylistManager.getById(plId);
-        if (!pl) return;
-        const songs = UserPlaylistManager.getSongs(plId);
-        _activeUserPlaylistId = plId;
-        openPlaylistView(pl.name, `Playlist • ${songs.length} songs`, null, songs, plId);
-      });
-    });
+    renderHomeView();
   }
-
-  // ==========================================================================
-  // HOOK: After every renderSidebarPlaylists + renderHomeView, also render user playlists
-  // ==========================================================================
-  // We use a setInterval micro-hook since the original functions are declarations
-  // and we can't reassign them. Instead, let's just call after initAppData completes.
-
-  // Patch initAppData to also render user playlists
-  const _origInitAppData = initAppData;
-  // Can't override a let-binding function expression directly — instead, observe renders:
-
-  // Hook into renderSidebarPlaylists via MutationObserver on dynamicLibraryList
-  if (dynamicLibraryList) {
-    const _sidebarObserver = new MutationObserver(() => {
-      // After sidebar re-renders, append user playlists
-      // Use a debounce to avoid infinite loops
-      clearTimeout(_sidebarObserver._t);
-      _sidebarObserver._t = setTimeout(() => {
-        if (dynamicLibraryList.querySelector('[data-type="user-playlist"]')) return;
-        renderUserPlaylistsInSidebar();
-      }, 50);
-    });
-    _sidebarObserver.observe(dynamicLibraryList, { childList: true });
-  }
-
-  // Hook into renderHomeView via MutationObserver on mobilePlaylistsCarousel
-  if (mobilePlaylistsCarousel) {
-    const _mobileObserver = new MutationObserver(() => {
-      clearTimeout(_mobileObserver._t);
-      _mobileObserver._t = setTimeout(() => {
-        if (mobilePlaylistsCarousel.querySelector('.user-pl-card')) return;
-        renderUserPlaylistsInMobileHome();
-      }, 50);
-    });
-    _mobileObserver.observe(mobilePlaylistsCarousel, { childList: true });
-  }
-
-  // Initial render (after a small delay to let initAppData complete)
-  setTimeout(() => {
-    renderUserPlaylistsInSidebar();
-    renderUserPlaylistsInMobileHome();
-  }, 2000);
 
   // ==========================================================================
   // ENHANCED openPlaylistView — 5th parameter: userPlaylistId

@@ -5568,13 +5568,34 @@ button.loading {
   border: none;
   color: #b3b3b3;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   margin-left: auto;
   transition: opacity 0.15s, color 0.15s;
   flex-shrink: 0;
 }
 .library-item:hover .user-pl-delete-btn { opacity: 1; }
 .library-item .user-pl-delete-btn:hover { color: #ff4d4d; }
+
+@media (hover: none) {
+  .library-item .user-pl-delete-btn {
+    opacity: 0.65;
+  }
+}
+
+.user-pl-cover-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #450af5, #1db954);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
 
 /* --- Playlist view: "Add songs" button for user playlists --- */
 .playlist-add-songs-btn {
