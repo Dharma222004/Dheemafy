@@ -22,24 +22,8 @@ const insertPlaylistTrack = db.prepare(`
 `);
 
 // Playlists to establish:
-// A. Sharu: songs where folder = 'Sharu'
-const sharuSongs = db.prepare("SELECT id, duration FROM media_file WHERE is_active = 1 AND LOWER(folder) = 'sharu' ORDER BY title ASC").all();
-const sharuDur = sharuSongs.reduce((acc, s) => acc + (s.duration || 0), 0);
-insertPlaylist.run('pl-sharu', 'Sharu', 'Curated playlist with songs from folder "Sharu"', sharuSongs.length, sharuDur, '/images/playlists/sharu.svg');
-for (const s of sharuSongs) {
-  insertPlaylistTrack.run('pl-sharu', s.id);
-}
-
-// B. Hills: songs where folder = 'Hills'
-const hillsSongs = db.prepare("SELECT id, duration FROM media_file WHERE is_active = 1 AND LOWER(folder) = 'hills' ORDER BY title ASC").all();
-const hillsDur = hillsSongs.reduce((acc, s) => acc + (s.duration || 0), 0);
-insertPlaylist.run('pl-hills', 'Hills', 'Curated playlist with songs from folder "Hills"', hillsSongs.length, hillsDur, '/images/playlists/hills.svg');
-for (const s of hillsSongs) {
-  insertPlaylistTrack.run('pl-hills', s.id);
-}
-
-// C. All Songs: All 590 songs (All Songs folder 378 + Sharu 191 + Hills 21)
-const allSongs = db.prepare("SELECT id, duration FROM media_file WHERE is_active = 1 ORDER BY title ASC").all();
+// All Songs: All songs unified in alphabetical order
+const allSongs = db.prepare("SELECT id, duration FROM media_file WHERE is_active = 1 ORDER BY LOWER(TRIM(title)) ASC").all();
 const allDur = allSongs.reduce((acc, s) => acc + (s.duration || 0), 0);
 insertPlaylist.run('pl-all-songs', 'All Songs', 'Complete library with all songs in alphabetical order', allSongs.length, allDur, '/images/playlists/all_songs.svg');
 for (const s of allSongs) {

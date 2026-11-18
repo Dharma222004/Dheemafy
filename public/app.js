@@ -278,20 +278,16 @@
   const mobileBtnShowAllTrending = document.getElementById('mobileBtnShowAllTrending');
 
   // ==========================================================================
-  // NEW FIXED PLAYLIST ORDER (as per app requirements)
+  // FIXED PLAYLIST ORDER (as per app requirements)
   // 1. All Songs – entire library alphabetically
-  // 2. Sharu – songs matching artist "Sharu"
-  // 3. Hills – songs matching artist/folder "Hills"
-  // 4. Anirudh – songs by Anirudh Ravichander
-  // 5. A.R Rahman – songs by A.R. Rahman
-  // 6. Sid Sriram – songs by Sid Sriram
-  // 7. Other Artists – songs not matched by the above 5 specific artists
+  // 2. Anirudh – songs by Anirudh Ravichander
+  // 3. A.R Rahman – songs by A.R. Rahman
+  // 4. Sid Sriram – songs by Sid Sriram
+  // 5. Other Artists – songs not matched by the above specific artists
   // After these, KNOWN_MUSIC_DIRECTORS artist playlists follow dynamically.
   // ==========================================================================
   const PLAYLIST_DEFINITIONS = [
     { id: 'pl-all-songs', name: 'All Songs', type: 'all', cover: '/images/playlists/all_songs.svg' },
-    { id: 'pl-sharu', name: 'Sharu', type: 'folder', folder: 'sharu', cover: '/images/playlists/sharu.svg' },
-    { id: 'pl-hills', name: 'Hills', type: 'folder', folder: 'hills', cover: '/images/playlists/hills.svg' },
     { id: 'pl-anirudh', name: 'Anirudh', type: 'artist', cover: '/images/artists/anirudh.jpg', aliases: ['anirudh ravichander', 'anirudh'] },
     { id: 'pl-arrahman', name: 'A.R Rahman', type: 'artist', cover: DEFAULT_SONG_COVER, aliases: ['a.r. rahman', 'a. r. rahman', 'ar rahman', 'rahman'] },
     { id: 'pl-sidsriram', name: 'Sid Sriram', type: 'artist', cover: DEFAULT_SONG_COVER, aliases: ['sid sriram'] },
@@ -363,8 +359,7 @@
   }
 
   // Returns the set of songs belonging to a given PLAYLIST_DEFINITION entry.
-  // type 'all'    → entire library sorted alphabetically by title (All Songs + Sharu + Hills)
-  // type 'folder' → songs whose folder matches (e.g. 'sharu' or 'hills')
+  // type 'all'    → entire library sorted alphabetically by title
   // type 'artist' → songs whose artist/album_artist/artists_json matches any alias
   // type 'other'  → songs NOT matched by ANY of the fixed artist playlists
   function getPlaylistSongs(pl) {
@@ -1025,7 +1020,7 @@
     // ========================================================================
     // MOBILE HOME FLOW: 4-TIER HIERARCHY
     // 1. ALL SONGS (Alphabetical by title, Show all)
-    // 2. FIXED PLAYLISTS: All Songs, Sharu, Hills, Anirudh, A.R Rahman, Sid Sriram, Other Artists
+    // 2. FIXED PLAYLISTS: All Songs, Anirudh, A.R Rahman, Sid Sriram, Other Artists
     // 3. MUSIC DIRECTOR-WISE PLAYLISTS (Dynamic from KNOWN_MUSIC_DIRECTORS)
     // 4. OTHER EXISTING HOME SECTIONS (Popular Artists, Trending)
     // ========================================================================

@@ -115,7 +115,7 @@ router.get('/', async (req, res) => {
       featuredPlaylists = db.prepare(`
         SELECT id, name, comment, duration, song_count, uploaded_image
         FROM playlist
-        WHERE public = 1
+        WHERE public = 1 AND id NOT IN ('pl-sharu', 'pl-hills') AND song_count > 0
         ORDER BY song_count DESC
       `).all();
     } catch (_) { /* SQLite may be empty */ }
