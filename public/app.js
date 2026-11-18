@@ -329,7 +329,9 @@
     const result = [];
     for (const s of songs) {
       if (!s || !s.title) continue;
-      const key = s.cloudinary_public_id || s.id || ((s.title || '').trim().toLowerCase() + '___' + (s.artist || '').trim().toLowerCase());
+      const cleanTitle = (s.title || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const primaryArtist = (s.artist || '').trim().toLowerCase().split(/[,&]/)[0].replace(/[^a-z0-9]/g, '');
+      const key = `${cleanTitle}___${primaryArtist || s.id}`;
       if (!seen.has(key)) {
         seen.add(key);
         result.push(s);

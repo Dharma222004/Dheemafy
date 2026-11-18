@@ -227,7 +227,71 @@ function _parseResource(res, metadataSongs) {
   };
 }
 
-/** Fetch, parse, and sort all Cloudinary audio resources */
+/** Check whether two parsed song objects are duplicates of each other */
+function areSongsDuplicate(a, b) {
+  const titleA = normalizeStr(a.title);
+  const titleB = normalizeStr(b.title);
+  if (!titleA || !titleB) return false;
+  if (titleA !== titleB) return false;
+
+  // Same normalized title.
+  // Check if same movie
+  if (a.movie && b.movie && normalizeStr(a.movie) === normalizeStr(b.movie)) {
+    return true;
+  }
+
+  // Check artist word overlap
+  const wordsA = (a.artist || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+  const wordsB = (b.artist || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+  const setB = new Set(wordsB);
+  const common = wordsA.filter(w => setB.has(w));
+  if (common.length >= 1) {
+    return true;
+  }
+
+  // Check filename overlap
+  const fileA = (a.cloudinary_public_id || '').toLowerCase().replace(/^\d+[-_]/, '');
+  const fileB = (b.cloudinary_public_id || '').toLowerCase().replace(/^\d+[-_]/, '');
+  if (fileA === fileB || fileA.includes(fileB) || fileB.includes(fileA)) {
+    return true;
+  }
+
+  // If both artists are generic (empty or Various Artists) and title is identical
+  if ((wordsA.length === 0 || wordsB.length === 0) && titleA === titleB) {
+    return true;
+  }
+
+  return false;
+}
+
+/** Deduplicate songs keeping the highest-quality version of each track */
+function deduplicateCatalog(songs) {
+  const uniqueSongs = [];
+  for (const song of songs) {
+    const existingIdx = uniqueSongs.findIndex(s => areSongsDuplicate(s, song));
+    if (existingIdx === -1) {
+      uniqueSongs.push(song);
+    } else {
+      const existing = uniqueSongs[existingIdx];
+      const existingHasNum = /^\d+[-_]/.test(existing.cloudinary_public_id);
+      const newHasNum = /^\d+[-_]/.test(song.cloudinary_public_id);
+      // Prefer: has folder ('Sharu', 'Hills', 'All Songs') > no folder
+      // Prefer: clean public_id without leading numbers like '37-_'
+      // Prefer: has movie metadata
+      // Prefer: longer duration
+      const preferNew = (!existing.folder && song.folder) ||
+                        (existingHasNum && !newHasNum) ||
+                        (!existing.movie && song.movie) ||
+                        ((song.duration || 0) > (existing.duration || 0));
+      if (preferNew) {
+        uniqueSongs[existingIdx] = song;
+      }
+    }
+  }
+  return uniqueSongs;
+}
+
+/** Fetch, parse, deduplicate, and sort all Cloudinary audio resources */
 async function _doFetch(folder = 'Songs') {
   if (!cloudinaryService.isConfigured()) {
     throw new Error('Cloudinary credentials are not configured.');
@@ -238,7 +302,7 @@ async function _doFetch(folder = 'Songs') {
   console.log(`[CloudinaryDirect] Cloudinary returned ${resources.length} resources.`);
 
   const metadataSongs = _getMetadata();
-  const songs         = [];
+  const rawSongs      = [];
   const seenPubIds    = new Set();
 
   for (const res of resources) {
@@ -248,18 +312,21 @@ async function _doFetch(folder = 'Songs') {
       seenPubIds.add(pubId);
 
       const song = _parseResource(res, metadataSongs);
-      songs.push(song);
+      rawSongs.push(song);
     } catch (err) {
       console.warn(`[CloudinaryDirect] Skipping ${res.public_id}:`, err.message);
     }
   }
+
+  // Deduplicate songs (removes duplicate uploads across folders or numeric prefixes)
+  const songs = deduplicateCatalog(rawSongs);
 
   // Sort alphabetically (same as DB ORDER BY LOWER(TRIM(title)))
   songs.sort((a, b) =>
     a.title.toLowerCase().localeCompare(b.title.toLowerCase(), 'en', { sensitivity: 'base' })
   );
 
-  console.log(`[CloudinaryDirect] Parsed ${songs.length} songs successfully.`);
+  console.log(`[CloudinaryDirect] Parsed ${rawSongs.length} raw resources -> ${songs.length} unique deduplicated songs.`);
   return songs;
 }
 
