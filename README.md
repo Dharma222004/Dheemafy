@@ -55,11 +55,6 @@ npm start
 ```
 Open **`http://localhost:4534`** in your browser.
 
-**Default Login:**
-- **Username:** `sharu`
-- **Password:** `sharu@123`
-
----
 
 ## ☁️ Deploy to Vercel
 
