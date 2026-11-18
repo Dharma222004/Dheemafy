@@ -5635,11 +5635,44 @@ button.loading {
   border: none;
   color: #b3b3b3;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
+  transition: opacity 0.15s, color 0.15s, transform 0.12s;
   flex-shrink: 0;
   margin-left: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 .table-row:hover .row-remove-btn { opacity: 1; }
 .row-remove-btn:hover { color: #ff4d4d; }
+.row-remove-btn:active { transform: scale(0.9); }
+
+/* --- Add to Playlist button in track rows --- */
+.row-add-pl-btn {
+  background: none;
+  border: none;
+  color: var(--text-subdued);
+  cursor: pointer;
+  padding: 6px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, transform 0.12s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+.table-row:hover .row-add-pl-btn { opacity: 1; }
+.row-add-pl-btn:hover { color: #fff; }
+.row-add-pl-btn:active { transform: scale(0.9); color: var(--spotify-green); }
+
+/* Touch devices: always show add and remove buttons */
+@media (max-width: 850px), (hover: none) {
+  .row-add-pl-btn,
+  .row-remove-btn {
+    opacity: 1 !important;
+    display: flex !important;
+  }
+}

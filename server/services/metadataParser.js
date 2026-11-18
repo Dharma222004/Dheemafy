@@ -175,9 +175,70 @@ function loadAllMetadata(metadataDir) {
   return allSongs;
 }
 
+/**
+ * Fallback parser for Cloudinary assets when not found in .txt metadata files
+ */
+function parseFromPublicId(publicId) {
+  if (!publicId) {
+    return {
+      title: 'Unknown Title',
+      artists: ['Various Artists'],
+      artistString: 'Various Artists',
+      movie: null,
+      album: 'Tamil Hits',
+      language: 'Tamil'
+    };
+  }
+
+  const parts = publicId.split('/');
+  let filename = parts[parts.length - 1];
+  filename = filename.replace(/\.[a-zA-Z0-9]+$/, ''); // remove extension
+
+  // Protect duo names
+  filename = filename.replace(/Vivek_-_Mervin/g, 'Vivek-Mervin');
+
+  let artistPart = 'Various Artists';
+  let titlePart = filename.replace(/_/g, ' ');
+  let movie = null;
+
+  if (filename.includes('_-_')) {
+    const split = filename.split('_-_');
+    artistPart = split[0].replace(/_/g, ' ').replace('Vivek-Mervin', 'Vivek - Mervin').trim();
+    titlePart = split.slice(1).join(' - ').replace(/_/g, ' ').trim();
+  } else if (filename.includes(' - ')) {
+    const split = filename.split(' - ');
+    artistPart = split[0].trim();
+    titlePart = split.slice(1).join(' - ').trim();
+  }
+
+  // Check for movie in title e.g. "Railin Oligal - From Blue Star" or "Kanimaa From Retro"
+  const fromMatch = titlePart.match(/[-_\s]*From\s+([A-Za-z0-9\s&]+)/i);
+  if (fromMatch) {
+    movie = fromMatch[1].trim();
+    titlePart = titlePart.replace(fromMatch[0], '').trim();
+  }
+
+  let artists = [];
+  if (artistPart.includes(',')) {
+    artists = artistPart.split(',').map(a => a.trim()).filter(Boolean);
+  } else {
+    artists = [artistPart];
+  }
+
+  return {
+    title: titlePart,
+    artists,
+    artistString: artists.join(', '),
+    movie: movie,
+    album: movie || 'Tamil Hits',
+    language: 'Tamil'
+  };
+}
+
 module.exports = {
   normalizeStr,
   slugify,
   parseMetadataLine,
-  loadAllMetadata
+  loadAllMetadata,
+  parseFromPublicId
 };

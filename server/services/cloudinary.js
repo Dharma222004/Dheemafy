@@ -39,93 +39,27 @@ function updateConfig({ cloudName, apiKey, apiSecret, folder }) {
  * Scan audio resources from Cloudinary with pagination.
  * In Cloudinary, audio files (MP3, AAC, FLAC, WAV, OGG) are categorized under resource_type 'video'.
  */
-async function scanAudioResources(folder = defaultFolder, nextCursor = null) {
+async function scanAudioResources(folder = null, nextCursor = null) {
   if (!isConfigured()) {
     throw new Error('Cloudinary credentials are not fully configured in environment variables.');
   }
 
-  // 1. Try Cloudinary Search API first (returns duration + comprehensive metadata)
-  try {
-    let expression = 'resource_type:video';
-    if (folder) {
-      expression += ` AND (folder:${folder}* OR asset_folder:${folder}* OR folder:"${folder}" OR asset_folder:"${folder}")`;
-    }
-    const searchReq = cloudinary.search
-      .expression(expression)
-      .sort_by('public_id', 'asc')  // stable sort for consistent pagination
-      .max_results(500);
-
-    if (nextCursor) {
-      searchReq.next_cursor(nextCursor);
-    }
-
-    const searchResult = await searchReq.execute();
-    if (searchResult && searchResult.resources && searchResult.resources.length > 0) {
-      return {
-        resources: searchResult.resources,
-        // next_cursor is present when there are more pages
-        nextCursor: searchResult.next_cursor || null
-      };
-    }
-  } catch (searchErr) {
-    const errorMsg = searchErr?.error?.message || searchErr?.message || String(searchErr);
-    const isRateLimit = searchErr?.error?.http_code === 420 || searchErr?.http_code === 420 || errorMsg.includes('Rate Limit');
-    if (isRateLimit) throw searchErr;
-    console.warn('[Cloudinary] Search API note, falling back to Admin API:', errorMsg);
-  }
-
-  // 2. Try resources_by_asset_folder if a folder is specified
-  if (folder) {
-    try {
-      const assetOptions = { max_results: 500 };
-      if (nextCursor) assetOptions.next_cursor = nextCursor;
-      const assetResult = await cloudinary.api.resources_by_asset_folder(folder, assetOptions);
-      if (assetResult && assetResult.resources && assetResult.resources.length > 0) {
-        return {
-          resources: assetResult.resources,
-          nextCursor: assetResult.next_cursor || null
-        };
-      }
-    } catch (err) {
-      const isRateLimit = err?.error?.http_code === 420 || err?.http_code === 420 || (err?.error?.message && err.error.message.includes('Rate Limit'));
-      if (isRateLimit) throw err;
-      console.warn(`[Cloudinary] Note on asset_folder scan for "${folder}":`, err?.error?.message || err?.message || err);
-    }
-  }
-
-  // 3. Prefix-based Admin API scan
   const options = {
     resource_type: 'video',
     type: 'upload',
-    prefix: folder ? (folder.endsWith('/') ? folder : `${folder}/`) : '',
     max_results: 500
   };
-  if (nextCursor) options.next_cursor = nextCursor;
 
-  const result = await cloudinary.api.resources(options);
-
-  // 4. If prefix returned 0, scan all video resources and filter by folder
-  if ((!result.resources || result.resources.length === 0) && folder) {
-    try {
-      const allRes = await cloudinary.api.resources({
-        resource_type: 'video',
-        type: 'upload',
-        max_results: 500
-      });
-      if (allRes && allRes.resources && allRes.resources.length > 0) {
-        const filtered = allRes.resources.filter(r =>
-          r.asset_folder === folder || r.folder === folder || (r.public_id && r.public_id.includes(folder))
-        );
-        return {
-          resources: filtered.length > 0 ? filtered : allRes.resources,
-          nextCursor: allRes.next_cursor || null
-        };
-      }
-    } catch (err) {
-      console.warn('[Cloudinary] Fallback scan note:', err.message);
-    }
+  if (nextCursor) {
+    options.next_cursor = nextCursor;
   }
 
+  // If a specific folder prefix is requested and not 'Songs'
+  if (folder && folder !== 'Songs' && folder !== 'music') {
+    options.prefix = folder.endsWith('/') ? folder : `${folder}/`;
+  }
+
+  const result = await cloudinary.api.resources(options);
   return {
     resources: result.resources || [],
     nextCursor: result.next_cursor || null
@@ -136,13 +70,13 @@ async function scanAudioResources(folder = defaultFolder, nextCursor = null) {
  * Fetch ALL audio resources from Cloudinary across ALL pages.
  * Handles unlimited songs (500 per page × up to maxPages pages).
  */
-async function scanAllAudioResources(folder = defaultFolder, maxPages = 40) {
+async function scanAllAudioResources(folder = null, maxPages = 40) {
   const allResources = [];
   const seenCursors  = new Set();
   let nextCursor     = null;
   let page           = 0;
 
-  console.log(`[Cloudinary] Starting full scan of folder "${folder}"...`);
+  console.log(`[Cloudinary] Starting full scan of audio resources...`);
 
   do {
     page++;
@@ -154,9 +88,11 @@ async function scanAllAudioResources(folder = defaultFolder, maxPages = 40) {
 
     const res = await scanAudioResources(folder, nextCursor);
     const count = res.resources ? res.resources.length : 0;
-    console.log(`[Cloudinary] Page ${page}: got ${count} resources (cursor: ${nextCursor ? 'yes' : 'none'} → ${res.nextCursor ? 'has more' : 'done'})`);
+    console.log(`[Cloudinary] Page ${page}: fetched ${count} resources (nextCursor: ${res.nextCursor ? 'yes' : 'no'})`);
 
-    if (count > 0) allResources.push(...res.resources);
+    if (count > 0) {
+      allResources.push(...res.resources);
+    }
 
     nextCursor = res.nextCursor;
   } while (nextCursor && page < maxPages);

@@ -802,6 +802,11 @@
         const json = await res.json();
         const rawSongs = (json && json.data) || [];
         const songs = deduplicateSongList(rawSongs);
+        songs.sort((a, b) => {
+          const titleA = (a.title || '').trim().toLowerCase();
+          const titleB = (b.title || '').trim().toLowerCase();
+          return titleA.localeCompare(titleB, undefined, { sensitivity: 'base', numeric: true });
+        });
         if (songs.length > 0 || !isCatalogLoaded) {
           catalog = songs;
           isCatalogLoaded = true;
@@ -1078,6 +1083,8 @@
           openPlaylistView(plDef.name, desc, plDef.cover, tracks);
         });
       });
+
+      renderUserPlaylistsInMobileHome();
     }
 
     if (mobileBtnShowAllPlaylists) {
@@ -1345,6 +1352,8 @@
           openPlaylistView(plDef.name, desc, plDef.cover, tracks);
         });
       });
+
+      renderUserPlaylistsInMobileHome();
     }
 
     // 2. Trending Shelf
@@ -1548,6 +1557,8 @@
         }
       };
     });
+
+    renderUserPlaylistsInSidebar();
   }
 
   async function openFolderPlaylist(folderName, plId) {
@@ -1656,6 +1667,11 @@
               </svg>
             </button>
             <span class="row-dur-span" data-song-id="${song.id}">${formatDuration(song.duration)}</span>
+            <button class="row-add-pl-btn" data-id="${song.id}" title="Add to playlist">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+              </svg>
+            </button>
             ${isUserPl ? `<button class="row-remove-btn" data-id="${song.id}" title="Remove from playlist">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
             </button>` : ''}
@@ -1666,7 +1682,7 @@
 
     playlistTrackRows.querySelectorAll('.table-row').forEach(row => {
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.row-heart-btn') || e.target.closest('.artist-link-item') || e.target.closest('.row-remove-btn')) return;
+        if (e.target.closest('.row-heart-btn') || e.target.closest('.artist-link-item') || e.target.closest('.row-remove-btn') || e.target.closest('.row-add-pl-btn')) return;
         const index = parseInt(row.getAttribute('data-index'), 10);
         // FIX-2: Clicking a row commits the browsing playlist to the active playback queue
         const isAlreadyActivePlaylist = (activePlaybackPlaylist === currentPlaylist ||
@@ -1692,6 +1708,16 @@
         e.stopPropagation();
         const id = btn.getAttribute('data-id');
         await toggleLikeSong(id);
+      });
+    });
+
+    // Add to playlist button on rows
+    playlistTrackRows.querySelectorAll('.row-add-pl-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const songId = btn.getAttribute('data-id');
+        const song = allSongs.find(s => s.id === songId);
+        if (song) openAddToPlaylistPicker(song);
       });
     });
 
@@ -1952,15 +1978,28 @@
             </div>
             <div class="row-time-col">
               <span class="row-dur-span" data-song-id="${s.id}">${formatDuration(s.duration)}</span>
+              <button class="row-add-pl-btn" data-id="${s.id}" title="Add to playlist">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                </svg>
+              </button>
             </div>
           </div>
         `).join('');
 
         searchMiniRows.querySelectorAll('.table-row').forEach(r => {
           r.addEventListener('click', (e) => {
-            if (e.target.closest('.artist-link-item')) return;
+            if (e.target.closest('.artist-link-item') || e.target.closest('.row-add-pl-btn')) return;
             const id = r.getAttribute('data-song-id');
             playTrackById(id, songs);
+          });
+        });
+        searchMiniRows.querySelectorAll('.row-add-pl-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            const song = allSongs.find(s => s.id === id);
+            if (song) openAddToPlaylistPicker(song);
           });
         });
         attachArtistLinkListeners(searchMiniRows);
@@ -1985,13 +2024,18 @@
                 </svg>
               </button>
               <span class="row-dur-span" data-song-id="${song.id}">${formatDuration(song.duration)}</span>
+              <button class="row-add-pl-btn" data-id="${song.id}" title="Add to playlist">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                </svg>
+              </button>
             </div>
           </div>
         `).join('');
 
         searchTableRows.querySelectorAll('.table-row').forEach(r => {
           r.addEventListener('click', (e) => {
-            if (e.target.closest('.artist-link-item') || e.target.closest('.row-heart-btn')) return;
+            if (e.target.closest('.artist-link-item') || e.target.closest('.row-heart-btn') || e.target.closest('.row-add-pl-btn')) return;
             const id = r.getAttribute('data-song-id');
             playTrackById(id, songs);
           });
@@ -2002,6 +2046,15 @@
             e.stopPropagation();
             const id = btn.getAttribute('data-id');
             await toggleLikeSong(id);
+          });
+        });
+
+        searchTableRows.querySelectorAll('.row-add-pl-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            const song = allSongs.find(s => s.id === id);
+            if (song) openAddToPlaylistPicker(song);
           });
         });
 
@@ -3031,10 +3084,11 @@
   if (mobileAddBtn) {
     mobileAddBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (currentSong) {
-        toggleLikeSong(currentSong.id);
-      } else if (currentTrackIndex >= 0 && activePlaybackPlaylist[currentTrackIndex]) {
-        toggleLikeSong(activePlaybackPlaylist[currentTrackIndex].id);
+      const track = currentSong || (currentTrackIndex >= 0 ? activePlaybackPlaylist[currentTrackIndex] : null);
+      if (track) {
+        openAddToPlaylistPicker(track);
+      } else {
+        openCreatePlaylistModal();
       }
     });
   }
@@ -3951,6 +4005,12 @@
   if (btnCreateNewPlaylist) {
     btnCreateNewPlaylist.addEventListener('click', () => {
       closeCreateSheet();
+      openCreatePlaylistModal();
+    });
+  }
+  const btnLibraryCreate = document.getElementById('btnLibraryCreate');
+  if (btnLibraryCreate) {
+    btnLibraryCreate.addEventListener('click', () => {
       openCreatePlaylistModal();
     });
   }
