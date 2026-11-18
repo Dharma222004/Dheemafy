@@ -16,10 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dheemafy.music.data.local.UserPlaylistManager
 import com.dheemafy.music.data.model.SearchData
+import com.dheemafy.music.data.model.Song
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.playback.PlaybackState
+import com.dheemafy.music.ui.components.AddToPlaylistDialog
 import com.dheemafy.music.ui.components.ArtistItemCard
 import com.dheemafy.music.ui.components.SongRow
 import com.dheemafy.music.ui.theme.*
@@ -31,6 +34,7 @@ fun SearchScreen(
     repository: MusicRepository,
     playbackManager: PlaybackManager,
     playbackState: PlaybackState,
+    userPlaylistManager: UserPlaylistManager,
     onArtistClick: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -38,6 +42,7 @@ fun SearchScreen(
     var query by remember { mutableStateOf("") }
     var searchData by remember { mutableStateOf<SearchData?>(null) }
     var isSearching by remember { mutableStateOf(false) }
+    var songToAddToPlaylist by remember { mutableStateOf<Song?>(null) }
 
     LaunchedEffect(query) {
         val trimmed = query.trim()
@@ -56,6 +61,14 @@ fun SearchScreen(
             onFailure = {
                 isSearching = false
             }
+        )
+    }
+
+    if (songToAddToPlaylist != null) {
+        AddToPlaylistDialog(
+            song = songToAddToPlaylist!!,
+            userPlaylistManager = userPlaylistManager,
+            onDismiss = { songToAddToPlaylist = null }
         )
     }
 
@@ -211,6 +224,9 @@ fun SearchScreen(
                                         scope.launch {
                                             repository.toggleLike(song.id, song.isLiked)
                                         }
+                                    },
+                                    onAddToPlaylistClick = {
+                                        songToAddToPlaylist = song
                                     }
                                 )
                             }

@@ -4,9 +4,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -33,6 +38,8 @@ fun SongRow(
     isPlaying: Boolean,
     onSongClick: () -> Unit,
     onLikeClick: () -> Unit = {},
+    onAddToPlaylistClick: (() -> Unit)? = null,
+    onRemoveClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     index: Int? = null
 ) {
@@ -83,7 +90,38 @@ fun SongRow(
             )
         }
 
-        IconButton(onClick = onLikeClick) {
+        if (onAddToPlaylistClick != null) {
+            IconButton(
+                onClick = onAddToPlaylistClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                    contentDescription = "Add to playlist",
+                    tint = SpotifyGrayText,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        if (onRemoveClick != null) {
+            IconButton(
+                onClick = onRemoveClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remove from playlist",
+                    tint = SpotifyGrayText,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        IconButton(
+            onClick = onLikeClick,
+            modifier = Modifier.size(36.dp)
+        ) {
             Icon(
                 imageVector = if (song.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = if (song.isLiked) "Unlike" else "Like",

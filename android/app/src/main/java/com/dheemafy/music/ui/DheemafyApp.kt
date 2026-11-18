@@ -19,6 +19,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.dheemafy.music.data.local.SessionManager
+import com.dheemafy.music.data.local.UserPlaylistManager
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.ui.components.MiniPlayer
@@ -36,6 +37,7 @@ fun DheemafyApp(
     repository: MusicRepository,
     sessionManager: SessionManager,
     playbackManager: PlaybackManager,
+    userPlaylistManager: UserPlaylistManager,
     modifier: Modifier = Modifier
 ) {
     val navController = rememberNavController()
@@ -132,6 +134,7 @@ fun DheemafyApp(
                         sessionManager = sessionManager,
                         playbackManager = playbackManager,
                         playbackState = playbackState,
+                        userPlaylistManager = userPlaylistManager,
                         onPlaylistClick = { id, name ->
                             navController.navigate("playlist/$id/$name")
                         },
@@ -146,6 +149,7 @@ fun DheemafyApp(
                         repository = repository,
                         playbackManager = playbackManager,
                         playbackState = playbackState,
+                        userPlaylistManager = userPlaylistManager,
                         onArtistClick = { id, name ->
                             navController.navigate("artist/$id/$name")
                         }
@@ -153,14 +157,12 @@ fun DheemafyApp(
                 }
 
                 composable(Screen.Playlists.route) {
-                    // Playlists tab displays standard library playlists: Sharu, Hills, All Songs
-                    PlaylistDetailScreen(
-                        playlistId = "all-songs",
-                        playlistName = "All Songs",
+                    PlaylistsScreen(
                         repository = repository,
-                        playbackManager = playbackManager,
-                        playbackState = playbackState,
-                        onBackClick = { navController.popBackStack() }
+                        userPlaylistManager = userPlaylistManager,
+                        onPlaylistClick = { id, name ->
+                            navController.navigate("playlist/$id/$name")
+                        }
                     )
                 }
 
@@ -179,6 +181,7 @@ fun DheemafyApp(
                         repository = repository,
                         playbackManager = playbackManager,
                         playbackState = playbackState,
+                        userPlaylistManager = userPlaylistManager,
                         onBackClick = { navController.popBackStack() }
                     )
                 }
@@ -214,6 +217,7 @@ fun DheemafyApp(
                 playbackState = playbackState,
                 playbackManager = playbackManager,
                 repository = repository,
+                userPlaylistManager = userPlaylistManager,
                 onCollapse = { isNowPlayingOpen = false }
             )
         }

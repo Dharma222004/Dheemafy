@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,12 +22,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import com.dheemafy.music.data.local.UserPlaylistManager
 import com.dheemafy.music.data.model.Album
 import com.dheemafy.music.data.model.Artist
 import com.dheemafy.music.data.model.Song
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.playback.PlaybackState
+import com.dheemafy.music.ui.components.AddToPlaylistDialog
 import com.dheemafy.music.ui.components.SongCoverImage
 import com.dheemafy.music.ui.theme.*
 import kotlinx.coroutines.launch
@@ -37,17 +40,27 @@ fun NowPlayingScreen(
     playbackState: PlaybackState,
     playbackManager: PlaybackManager,
     repository: MusicRepository,
+    userPlaylistManager: UserPlaylistManager,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val song = playbackState.currentSong ?: return
     val scope = rememberCoroutineScope()
+    var showAddToPlaylistDialog by remember { mutableStateOf(false) }
 
     var isDraggingSlider by remember { mutableStateOf(false) }
     var draggedPositionMs by remember { mutableLongStateOf(0L) }
     val currentPositionFromTicker by playbackManager.positionMs.collectAsState()
     val displayPositionMs = if (isDraggingSlider) draggedPositionMs else currentPositionFromTicker
     val durationMs = playbackState.durationMs.coerceAtLeast(1L)
+
+    if (showAddToPlaylistDialog) {
+        AddToPlaylistDialog(
+            song = song,
+            userPlaylistManager = userPlaylistManager,
+            onDismiss = { showAddToPlaylistDialog = false }
+        )
+    }
 
     Box(
         modifier = modifier
@@ -152,6 +165,18 @@ fun NowPlayingScreen(
                         fontSize = 15.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Small Add to Playlist button in corner
+                IconButton(
+                    onClick = { showAddToPlaylistDialog = true }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                        contentDescription = "Add to playlist",
+                        tint = SpotifyWhite,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 

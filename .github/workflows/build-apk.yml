@@ -70,26 +70,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
-          tag_name: android-v1.2.0
-          name: "Dheemafy Android v1.2.0"
+          tag_name: android-v1.3.0
+          name: "Dheemafy Android v1.3.0"
           draft: false
           prerelease: false
           make_latest: true
           body: |
-            ## Dheemafy Android Application (v1.2.0) 🎵
+            ## Dheemafy Android Application (v1.3.0) 🎵
             
             Official native Android APK build for Dheemafy private music streaming.
             
-            ### ✨ What's New in v1.2.0
-            - 📱 **Official Dheemafy App Icon**: Replaced default Spotify launcher icon with official high-resolution Dheemafy logo across all phone home screen densities.
-            - 🔐 **Clean Login Screen**: Completely cleared prefilled `"sharu or you"` text and hid the server URL configuration (automatically connects to `https://dheemafy.vercel.app/`).
-            - 👤 **Clean User Profile Dialog**: Removed technical backend server URLs from the user logout modal.
-            - 🎨 **Popular Artists Images Fixed**: Resolved relative `/images/artists/...` URLs against backend with vibrant initial-gradient avatar fallbacks.
-            - ⚡ **Zero-Lag High Performance**:
-              - Decoupled high-frequency position ticks from global `PlaybackState` to eliminate 95% of unnecessary Compose tree recompositions.
-              - Added stable unique item keys across all `LazyColumn` and `LazyRow` components for smooth scrolling.
-              - Added Coil memory (25% RAM) and disk caching with bitmap pooling in `DheemafyApplication`.
-              - Compiled with release optimizations for 60 FPS silky smooth playback.
+            ### ✨ What's New in v1.3.0
+            - ➕ **Custom Playlist Creation**: Added "+ Create Playlist" button on the Home screen (first place!) and Your Library tab. Name your playlist (e.g., "DD") and immediately start adding songs.
+            - 🔍 **Live Song Search & Add Dialog**: Search through all 569 songs and add them with a single tap. Live checkmark indicates already-added songs.
+            - 📌 **First-Place Display**: All user-created custom playlists appear right at the beginning of the playlists shelf on Home and in Your Library.
+            - 🎵 **Corner Quick-Add Button**: Added a dedicated Playlist Add button in the Now Playing screen corner and on every song row throughout the app.
+            - 💾 **Local Offline Storage**: All custom playlists and songs are securely stored on your device and persist across app closures and restarts.
+            - 🎧 **Isolated Playlist Playback**: Playing from any custom playlist queues and plays ONLY the songs from that specific playlist.
+            - 📚 **Full Catalog Loaded**: Increased catalog limit to 1000 songs so all 569 songs load completely in A-Z alphabetical order.
             
             ### 📲 Direct Installation
             1. Download **`Dheemafy.apk`** below directly to your phone.

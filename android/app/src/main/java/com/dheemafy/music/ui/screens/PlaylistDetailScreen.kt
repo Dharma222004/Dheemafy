@@ -16,16 +16,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
+import com.dheemafy.music.data.local.UserPlaylistManager
 import com.dheemafy.music.data.model.PlaylistDetail
 import com.dheemafy.music.data.model.Song
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.playback.PlaybackState
+import com.dheemafy.music.ui.components.AddSongsToPlaylistDialog
+import com.dheemafy.music.ui.components.AddToPlaylistDialog
 import com.dheemafy.music.ui.components.PlaylistFallbackCard
 import com.dheemafy.music.ui.components.SongRow
 import com.dheemafy.music.ui.theme.*
@@ -38,63 +39,117 @@ fun PlaylistDetailScreen(
     repository: MusicRepository,
     playbackManager: PlaybackManager,
     playbackState: PlaybackState,
+    userPlaylistManager: UserPlaylistManager,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
+    val isUserPlaylist = playlistId.startsWith("upl_")
+
     var playlistDetail by remember { mutableStateOf<PlaylistDetail?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    var showAddSongsDialog by remember { mutableStateOf(false) }
+    var songToAddToPlaylist by remember { mutableStateOf<Song?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    val userPlaylists by userPlaylistManager.playlists.collectAsState()
+    val currentUserPlaylist = remember(userPlaylists, playlistId) {
+        if (isUserPlaylist) userPlaylists.find { it.id == playlistId } else null
+    }
+
+    // Cache of catalog songs for user playlist resolution
+    var allCatalogSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
 
     fun loadPlaylist() {
         scope.launch {
             isLoading = true
             error = null
-            // Check if it's "All Songs" folder or standard playlist ID
-            val result = if (playlistId.equals("all-songs", ignoreCase = true) || playlistName.equals("All Songs", ignoreCase = true)) {
-                repository.getSongs(folder = null, limit = 500).map { songs ->
-                    val sortedSongs = songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
-                    PlaylistDetail(
-                        id = "all-songs",
-                        name = "All Songs",
-                        comment = "Complete music library catalog",
-                        songCount = sortedSongs.size,
-                        tracks = sortedSongs
-                    )
-                }
-            } else {
-                repository.getPlaylist(playlistId).map { detail ->
-                    val sortedTracks = detail.tracks.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
-                    detail.copy(tracks = sortedTracks, songCount = sortedTracks.size)
-                }
-            }
 
-            result.fold(
-                onSuccess = { detail ->
-                    playlistDetail = detail
-                    isLoading = false
-                },
-                onFailure = { err ->
-                    // Fallback to songs route with folder param if playlist lookup fails
-                    repository.getSongs(folder = playlistName, limit = 500).fold(
-                        onSuccess = { folderSongs ->
-                            val sortedFolderSongs = folderSongs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+            if (isUserPlaylist) {
+                // Fetch catalog songs if not already loaded
+                if (allCatalogSongs.isEmpty()) {
+                    repository.getSongs(limit = 1000).fold(
+                        onSuccess = { songs ->
+                            allCatalogSongs = songs
+                            val songMap = songs.associateBy { it.id }
+                            val pl = currentUserPlaylist ?: userPlaylistManager.getById(playlistId)
+                            val tracks = pl?.songIds?.mapNotNull { songMap[it] } ?: emptyList()
                             playlistDetail = PlaylistDetail(
                                 id = playlistId,
-                                name = playlistName,
-                                comment = "Curated playlist",
-                                songCount = sortedFolderSongs.size,
-                                tracks = sortedFolderSongs
+                                name = pl?.name ?: playlistName,
+                                comment = "Custom User Playlist",
+                                songCount = tracks.size,
+                                tracks = tracks
                             )
                             isLoading = false
                         },
-                        onFailure = {
-                            error = err.message ?: "Failed to load playlist"
+                        onFailure = { err ->
+                            error = err.message ?: "Failed to load library catalog"
                             isLoading = false
                         }
                     )
+                } else {
+                    val songMap = allCatalogSongs.associateBy { it.id }
+                    val pl = currentUserPlaylist ?: userPlaylistManager.getById(playlistId)
+                    val tracks = pl?.songIds?.mapNotNull { songMap[it] } ?: emptyList()
+                    playlistDetail = PlaylistDetail(
+                        id = playlistId,
+                        name = pl?.name ?: playlistName,
+                        comment = "Custom User Playlist",
+                        songCount = tracks.size,
+                        tracks = tracks
+                    )
+                    isLoading = false
                 }
-            )
+            } else if (playlistId.equals("all-songs", ignoreCase = true) || playlistName.equals("All Songs", ignoreCase = true)) {
+                repository.getSongs(folder = null, limit = 1000).fold(
+                    onSuccess = { songs ->
+                        val sortedSongs = songs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+                        playlistDetail = PlaylistDetail(
+                            id = "all-songs",
+                            name = "All Songs",
+                            comment = "Complete music library catalog",
+                            songCount = sortedSongs.size,
+                            tracks = sortedSongs
+                        )
+                        isLoading = false
+                    },
+                    onFailure = { err ->
+                        error = err.message ?: "Failed to load songs"
+                        isLoading = false
+                    }
+                )
+            } else {
+                repository.getPlaylist(playlistId).fold(
+                    onSuccess = { detail ->
+                        val sortedTracks = detail.tracks.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+                        playlistDetail = detail.copy(tracks = sortedTracks, songCount = sortedTracks.size)
+                        isLoading = false
+                    },
+                    onFailure = { err ->
+                        // Fallback to folder query
+                        repository.getSongs(folder = playlistName, limit = 1000).fold(
+                            onSuccess = { folderSongs ->
+                                val sorted = folderSongs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.trim() })
+                                playlistDetail = PlaylistDetail(
+                                    id = playlistId,
+                                    name = playlistName,
+                                    comment = "Curated playlist",
+                                    songCount = sorted.size,
+                                    tracks = sorted
+                                )
+                                isLoading = false
+                            },
+                            onFailure = {
+                                error = err.message ?: "Failed to load playlist"
+                                isLoading = false
+                            }
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -102,13 +157,81 @@ fun PlaylistDetailScreen(
         loadPlaylist()
     }
 
-    val headerGradientColors = remember(playlistName) {
+    // Reactive update for user playlist modifications
+    LaunchedEffect(currentUserPlaylist?.songIds, allCatalogSongs) {
+        if (isUserPlaylist && allCatalogSongs.isNotEmpty() && currentUserPlaylist != null) {
+            val songMap = allCatalogSongs.associateBy { it.id }
+            val tracks = currentUserPlaylist.songIds.mapNotNull { songMap[it] }
+            playlistDetail = PlaylistDetail(
+                id = playlistId,
+                name = currentUserPlaylist.name,
+                comment = "Custom User Playlist",
+                songCount = tracks.size,
+                tracks = tracks
+            )
+        }
+    }
+
+    val headerGradientColors = remember(playlistName, isUserPlaylist) {
         when {
+            isUserPlaylist -> listOf(Color(0xFF0F5132), Color(0xFF132A13), SpotifyBlack)
             playlistName.contains("sharu", ignoreCase = true) -> listOf(Color(0xFF581C87), SpotifyBlack)
             playlistName.contains("hills", ignoreCase = true) -> listOf(Color(0xFF065F46), SpotifyBlack)
             playlistName.contains("all", ignoreCase = true) -> listOf(Color(0xFF1E3A8A), SpotifyBlack)
             else -> listOf(Color(0xFF2E4B37), SpotifyBlack)
         }
+    }
+
+    if (showAddSongsDialog) {
+        AddSongsToPlaylistDialog(
+            playlistId = playlistId,
+            playlistName = playlistDetail?.name ?: playlistName,
+            userPlaylistManager = userPlaylistManager,
+            repository = repository,
+            onDismiss = { showAddSongsDialog = false }
+        )
+    }
+
+    if (songToAddToPlaylist != null) {
+        AddToPlaylistDialog(
+            song = songToAddToPlaylist!!,
+            userPlaylistManager = userPlaylistManager,
+            onDismiss = { songToAddToPlaylist = null }
+        )
+    }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            containerColor = SpotifyCard,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text("Delete playlist", color = SpotifyWhite, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Are you sure you want to delete \"${playlistDetail?.name ?: playlistName}\"? This action cannot be undone.",
+                    color = SpotifyGrayText
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        userPlaylistManager.deletePlaylist(playlistId)
+                        showDeleteConfirmDialog = false
+                        onBackClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = SpotifyError, contentColor = SpotifyWhite)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("Cancel", color = SpotifyGrayText)
+                }
+            }
+        )
     }
 
     Box(
@@ -154,16 +277,32 @@ fun PlaylistDetailScreen(
                             .padding(16.dp)
                     ) {
                         Column {
-                            IconButton(
-                                onClick = onBackClick,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = SpotifyWhite
-                                )
+                                IconButton(onClick = onBackClick) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back",
+                                        tint = SpotifyWhite
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                if (isUserPlaylist) {
+                                    IconButton(onClick = { showDeleteConfirmDialog = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = "Delete Playlist",
+                                            tint = SpotifyGrayText
+                                        )
+                                    }
+                                }
                             }
+
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
                                 modifier = Modifier
@@ -181,10 +320,10 @@ fun PlaylistDetailScreen(
 
                                 Spacer(modifier = Modifier.width(16.dp))
 
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "PLAYLIST",
-                                        color = SpotifyGrayText,
+                                        text = if (isUserPlaylist) "YOUR PLAYLIST" else "PLAYLIST",
+                                        color = SpotifyGreenBright,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 1.sp
@@ -193,13 +332,14 @@ fun PlaylistDetailScreen(
                                     Text(
                                         text = detail.name,
                                         color = SpotifyWhite,
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = 22.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    val trackCount = detail.songCount ?: tracks.size
+                                    val trackCount = tracks.size
                                     Text(
-                                        text = "$trackCount songs • Alphabetical",
+                                        text = "$trackCount ${if (trackCount == 1) "song" else "songs"}${if (!isUserPlaylist) " • Alphabetical" else ""}",
                                         color = SpotifyGrayText,
                                         fontSize = 13.sp
                                     )
@@ -209,7 +349,7 @@ fun PlaylistDetailScreen(
                     }
                 }
 
-                // Control Bar: Big Green Play button & Shuffle
+                // Control Bar: Big Green Play button & Shuffle & (+ Add Songs for user playlists)
                 item {
                     Row(
                         modifier = Modifier
@@ -233,6 +373,28 @@ fun PlaylistDetailScreen(
                             )
                         }
 
+                        if (isUserPlaylist) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = { showAddSongsDialog = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SpotifyDarkSurface,
+                                    contentColor = SpotifyWhite
+                                ),
+                                shape = RoundedCornerShape(20.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = SpotifyGreen
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Add Songs", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
                         Spacer(modifier = Modifier.weight(1f))
 
                         val isPlayingThisPlaylist = playbackState.queueTitle == detail.name && playbackState.isPlaying
@@ -245,6 +407,8 @@ fun PlaylistDetailScreen(
                                     } else {
                                         playbackManager.playQueue(tracks, 0, detail.name)
                                     }
+                                } else if (isUserPlaylist) {
+                                    showAddSongsDialog = true
                                 }
                             },
                             containerColor = SpotifyGreen,
@@ -261,7 +425,46 @@ fun PlaylistDetailScreen(
                     }
                 }
 
-                // Track List (Sorted Alphabetically A-Z)
+                // If user playlist is empty, show helpful empty state with Add Songs prompt
+                if (tracks.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp, horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "This playlist is empty",
+                                color = SpotifyWhite,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Search and add your favorite tracks to start listening.",
+                                color = SpotifyGrayText,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Button(
+                                onClick = { showAddSongsDialog = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SpotifyGreen,
+                                    contentColor = SpotifyBlack
+                                ),
+                                shape = RoundedCornerShape(24.dp),
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Add to this playlist", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            }
+                        }
+                    }
+                }
+
+                // Track List (Isolated Queue Playback: plays only this playlist!)
                 itemsIndexed(tracks, key = { _, song -> song.id }) { index, song ->
                     val isCurrent = playbackState.currentSong?.id == song.id
                     SongRow(
@@ -270,14 +473,21 @@ fun PlaylistDetailScreen(
                         isPlaying = isCurrent && playbackState.isPlaying,
                         index = index,
                         onSongClick = {
-                            // Isolated Queue Playback: Starts playing from this playlist!
                             playbackManager.playQueue(tracks, index, detail.name)
                         },
                         onLikeClick = {
                             scope.launch {
                                 repository.toggleLike(song.id, song.isLiked)
                             }
-                        }
+                        },
+                        onAddToPlaylistClick = {
+                            songToAddToPlaylist = song
+                        },
+                        onRemoveClick = if (isUserPlaylist) {
+                            {
+                                userPlaylistManager.removeSongFromPlaylist(playlistId, song.id)
+                            }
+                        } else null
                     )
                 }
             }

@@ -8,6 +8,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.dheemafy.music.data.api.ApiClient
 import com.dheemafy.music.data.local.SessionManager
+import com.dheemafy.music.data.local.UserPlaylistManager
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 
@@ -24,6 +25,9 @@ class DheemafyApplication : Application(), ImageLoaderFactory {
         private set
 
     lateinit var playbackManager: PlaybackManager
+        private set
+
+    lateinit var userPlaylistManager: UserPlaylistManager
         private set
 
     override fun newImageLoader(): ImageLoader {
@@ -49,6 +53,7 @@ class DheemafyApplication : Application(), ImageLoaderFactory {
         instance = this
 
         sessionManager = SessionManager(this)
+        userPlaylistManager = UserPlaylistManager(this)
         apiClient = ApiClient(sessionManager)
         repository = MusicRepository(apiClient, sessionManager)
         playbackManager = PlaybackManager(this)

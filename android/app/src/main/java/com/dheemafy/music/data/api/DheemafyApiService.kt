@@ -23,7 +23,7 @@ interface DheemafyApiService {
         @Query("artist") artist: String? = null,
         @Query("artistId") artistId: String? = null,
         @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 100
+        @Query("limit") limit: Int = 1000
     ): Response<ApiResponse<List<Song>>>
 
     @GET("api/songs/{id}")

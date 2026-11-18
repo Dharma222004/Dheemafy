@@ -40,7 +40,7 @@ class MusicRepository(
         }
     }
 
-    suspend fun getSongs(folder: String? = null, artist: String? = null, limit: Int = 500): Result<List<Song>> = withContext(Dispatchers.IO) {
+    suspend fun getSongs(folder: String? = null, artist: String? = null, limit: Int = 1000): Result<List<Song>> = withContext(Dispatchers.IO) {
         try {
             val response = apiClient.service.getSongs(folder = folder, artist = artist, limit = limit)
             if (response.isSuccessful && response.body()?.data != null) {

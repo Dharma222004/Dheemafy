@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
         val sessionManager = app.sessionManager
         val repository = app.repository
         val playbackManager = app.playbackManager
+        val userPlaylistManager = app.userPlaylistManager
 
         setContent {
             DheemafyTheme {
@@ -37,7 +38,8 @@ class MainActivity : ComponentActivity() {
                         DheemafyApp(
                             repository = repository,
                             sessionManager = sessionManager,
-                            playbackManager = playbackManager
+                            playbackManager = playbackManager,
+                            userPlaylistManager = userPlaylistManager
                         )
                     } else {
                         LoginScreen(

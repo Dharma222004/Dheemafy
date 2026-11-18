@@ -10,26 +10,34 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dheemafy.music.R
 import com.dheemafy.music.data.local.SessionManager
+import com.dheemafy.music.data.local.UserPlaylist
+import com.dheemafy.music.data.local.UserPlaylistManager
 import com.dheemafy.music.data.model.HomeData
 import com.dheemafy.music.data.model.Song
-import com.dheemafy.music.data.model.User
 import com.dheemafy.music.data.repository.MusicRepository
 import com.dheemafy.music.playback.PlaybackManager
 import com.dheemafy.music.playback.PlaybackState
+import com.dheemafy.music.ui.components.AddToPlaylistDialog
 import com.dheemafy.music.ui.components.ArtistItemCard
+import com.dheemafy.music.ui.components.CreatePlaylistDialog
 import com.dheemafy.music.ui.components.PlaylistItemCard
 import com.dheemafy.music.ui.components.SongRow
 import com.dheemafy.music.ui.theme.*
@@ -42,6 +50,7 @@ fun HomeScreen(
     sessionManager: SessionManager,
     playbackManager: PlaybackManager,
     playbackState: PlaybackState,
+    userPlaylistManager: UserPlaylistManager,
     onPlaylistClick: (String, String) -> Unit,
     onArtistClick: (String, String) -> Unit,
     modifier: Modifier = Modifier
@@ -51,8 +60,11 @@ fun HomeScreen(
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var showProfileDialog by remember { mutableStateOf(false) }
+    var showCreatePlaylistDialog by remember { mutableStateOf(false) }
+    var songToAddToPlaylist by remember { mutableStateOf<Song?>(null) }
 
     val user = sessionManager.currentUser.collectAsState().value
+    val userPlaylists by userPlaylistManager.playlists.collectAsState()
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when (hour) {
@@ -81,6 +93,28 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         loadData()
+    }
+
+    // Create Playlist Dialog
+    if (showCreatePlaylistDialog) {
+        CreatePlaylistDialog(
+            onDismiss = { showCreatePlaylistDialog = false },
+            onConfirm = { name ->
+                showCreatePlaylistDialog = false
+                val newPl = userPlaylistManager.createPlaylist(name)
+                // Open newly created playlist immediately so user can add songs
+                onPlaylistClick(newPl.id, newPl.name)
+            }
+        )
+    }
+
+    // Add To Playlist Dialog
+    if (songToAddToPlaylist != null) {
+        AddToPlaylistDialog(
+            song = songToAddToPlaylist!!,
+            userPlaylistManager = userPlaylistManager,
+            onDismiss = { songToAddToPlaylist = null }
+        )
     }
 
     // Profile & Logout Dialog
@@ -253,26 +287,40 @@ fun HomeScreen(
                     }
                 }
 
-                // Featured Playlists Shelf
-                if (data.featuredPlaylists.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Featured Playlists",
-                            color = SpotifyWhite,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) {
-                            items(data.featuredPlaylists, key = { it.id }) { playlist ->
-                                PlaylistItemCard(
-                                    playlist = playlist,
-                                    onClick = { onPlaylistClick(playlist.id, playlist.name) },
-                                    baseUrl = sessionManager.getBaseUrl()
-                                )
-                            }
+                // Playlists Shelf: (+ Create Playlist FIRST, User Playlists NEXT, Featured Playlists AFTER)
+                item {
+                    Text(
+                        text = "Playlists",
+                        color = SpotifyWhite,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        // 1. "+ Create Playlist" Card FIRST
+                        item(key = "create_playlist_card") {
+                            CreatePlaylistCard(
+                                onClick = { showCreatePlaylistDialog = true }
+                            )
+                        }
+
+                        // 2. User-created playlists NEXT (in first place!)
+                        items(userPlaylists, key = { it.id }) { pl ->
+                            UserPlaylistItemCard(
+                                playlist = pl,
+                                onClick = { onPlaylistClick(pl.id, pl.name) }
+                            )
+                        }
+
+                        // 3. Featured / Library Playlists
+                        items(data.featuredPlaylists, key = { it.id }) { playlist ->
+                            PlaylistItemCard(
+                                playlist = playlist,
+                                onClick = { onPlaylistClick(playlist.id, playlist.name) },
+                                baseUrl = sessionManager.getBaseUrl()
+                            )
                         }
                     }
                 }
@@ -303,6 +351,9 @@ fun HomeScreen(
                                 scope.launch {
                                     repository.toggleLike(song.id, song.isLiked)
                                 }
+                            },
+                            onAddToPlaylistClick = {
+                                songToAddToPlaylist = song
                             }
                         )
                     }
@@ -358,11 +409,161 @@ fun HomeScreen(
                                 scope.launch {
                                     repository.toggleLike(song.id, song.isLiked)
                                 }
+                            },
+                            onAddToPlaylistClick = {
+                                songToAddToPlaylist = song
                             }
                         )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun CreatePlaylistCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(140.dp)
+            .clickable { onClick() }
+            .padding(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(124.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SpotifyDarkSurface),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(SpotifyGreen),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Create Playlist",
+                        tint = SpotifyBlack,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "New Playlist",
+                    color = SpotifyWhite,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Create Playlist",
+            color = SpotifyWhite,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        Text(
+            text = "Tap to create",
+            color = SpotifyGreen,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+fun UserPlaylistItemCard(
+    playlist: UserPlaylist,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(140.dp)
+            .clickable { onClick() }
+            .padding(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(124.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF0F5132), Color(0xFF132A13), SpotifyCard)
+                    )
+                )
+                .padding(10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LibraryMusic,
+                    contentDescription = null,
+                    tint = SpotifyGreen,
+                    modifier = Modifier.size(34.dp)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "YOUR PLAYLIST",
+                    color = SpotifyGreenBright,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    maxLines = 1
+                )
+                Text(
+                    text = playlist.name,
+                    color = SpotifyWhite,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = playlist.name,
+            color = SpotifyWhite,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        val count = playlist.songIds.size
+        Text(
+            text = "$count ${if (count == 1) "song" else "songs"}",
+            color = SpotifyGrayText,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
